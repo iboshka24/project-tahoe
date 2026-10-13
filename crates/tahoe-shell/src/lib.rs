@@ -7,6 +7,7 @@
 //! snapshots of this model and forward events back into it.
 
 pub mod design;
+pub mod finder;
 pub mod preview;
 
 use std::collections::BTreeMap;
