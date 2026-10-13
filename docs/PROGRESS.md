@@ -155,13 +155,32 @@ WAYLAND_DISPLAY=/tmp/tahoe-wi.sock wayland-info
 python3 tests/verify-preview.py
 ```
 
-### Фактические результаты последнего прогона
+### Фактические результаты финального прогона
 
-| Проверка | Результат |
-|---|---|
-| `cargo test` | 312 тестов, 0 падений |
-| `cargo test -p tahoe-compositor --test wayland_client` | 8/8, реальный `wayland-client` |
-| `wayland-info` против headless | все 8 глобалов, режим, seat, shm-форматы |
-| `--backend winit --exit-after 3` | exit 0, окно открылось и закрылось |
-| `python3 tests/verify-preview.py` | 11/11 утверждений |
-| `cargo clippy --all-targets -- -D warnings` | см. Validation выше |
+| Проверка | Команда | Результат |
+|---|---|---|
+| Все тесты | `cargo test` | **312 passed, 0 failed** |
+| Интеграция с настоящим клиентом | `cargo test -p tahoe-compositor --test wayland_client` | 8/8 |
+| Линт | `cargo clippy --all-targets` | 0 warnings, 0 errors |
+| Формат | `cargo fmt --all -- --check` | clean |
+| Сборка бинарей | `cargo build --bins` | ok |
+| Сторонний клиент | `wayland-info` против headless | 8 глобалов, `1920x1080@60Hz`, `capabilities: pointer keyboard` |
+| Реальный рендер | `--backend winit --exit-after 3` | exit 0 |
+| Оформление | `python3 tests/verify-preview.py` | 11/11 |
+| Запуск скрипта | `tahoe-uel run py.py` | `#!/usr/bin/env python3` → exit 0 |
+| Тайм-аут | `tahoe-uel run --timeout 0.3 slow.sh` | `"timed_out":true`, 300 ms |
+| Отказ | `tahoe-uel run x.dmg` | exit 1, «mount it read-only … never execute it» |
+| Инъекция | `run args.sh '$(touch …)'` | аргумент передан буквально, файл не создан |
+| TTY-профиль | `cargo check -p tahoe-compositor --features tty` | ok (не подключён к запуску) |
+
+### Проверки, которые НЕ выполнялись
+
+Перечислено, чтобы не создавать ложного впечатления:
+
+- запуск Wine или Darling (не установлены, установка требует root);
+- сборка ISO (`mkarchiso` не установлен);
+- сборка пакетов из `packages/` (нужен чистый chroot);
+- работа TTY-бэкенда на реальном VT (нет seatd и прав на DRM);
+- запуск PE/Mach-O файлов — ни одного;
+- рендеринг композитора на GPU (winit-путь проверен как «запускается и
+  завершается», но пиксели GL не снимались).
