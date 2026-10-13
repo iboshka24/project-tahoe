@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Tahoe live image package list (x86_64). archiso hard-requires mkinitcpio
+# and mkinitcpio-archiso in this list. STATUS: unbuilt, untested.
+base
+linux
+linux-firmware
+mkinitcpio
+mkinitcpio-archiso
+syslinux
+systemd
+systemd-sysvcompat
+pacman
+archlinux-keyring
+tahoe-base
+tahoe-compositor
+tahoe-uel
+flatpak
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+foot

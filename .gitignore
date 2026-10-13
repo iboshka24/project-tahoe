@@ -1,0 +1,5 @@
+/target/
+*.orig
+*.rej
+work/
+out/

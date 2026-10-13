@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Tahoe archiso profile. Derived from archiso's releng profile patterns;
+# profile format documented at https://wiki.archlinux.org/title/Archiso.
+# STATUS: written, NOT YET BUILT (needs `archiso` + clean chroot).
+
+iso_name="tahoe"
+iso_label="TAHOE_$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m)"
+iso_publisher="Project Tahoe <https://github.com/iboshka24/project-tahoe>"
+iso_application="Project Tahoe Live/Rescue"
+iso_version="$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y.%m.%d)"
+install_dir="tahoe"
+buildmodes=('iso')
+bootmodes=('bios.syslinux' 'uefi.systemd-boot')
+arch="x86_64"
+pacman_conf="pacman.conf"
+airootfs_image_type="squashfs"
+airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
+file_permissions=(
+  ["/etc/shadow"]="0:0:400"
+  ["/root"]="0:0:750"
+)

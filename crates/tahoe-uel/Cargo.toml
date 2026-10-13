@@ -1,0 +1,14 @@
+[package]
+name = "tahoe-uel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Universal Execution Layer: probe bytes, choose a strategy, report confidence (decide only, stage 1)"
+
+[[bin]]
+name = "tahoe-uel"
+path = "src/main.rs"
+
+[dependencies]
+tahoe-core = { path = "../tahoe-core" }
+tahoe-format = { path = "../tahoe-format" }

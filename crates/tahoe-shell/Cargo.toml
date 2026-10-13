@@ -1,0 +1,6 @@
+[package]
+name = "tahoe-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Tahoe Shell state model: dock, workspaces, launcher index (rendering-independent)"

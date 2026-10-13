@@ -1,0 +1,9 @@
+[package]
+name = "tahoe-format"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Byte-level identification of ELF, PE, Mach-O, AppImage, DMG, scripts (parse only, never execute)"
+
+[dependencies]
+tahoe-core = { path = "../tahoe-core" }

@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: 0BSD
+# Maintainer: Project Tahoe
+# STATUS: prototype, NOT YET BUILT (needs clean chroot + network for crates).
+pkgname=tahoe-compositor
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Tahoe Wayland compositor on Smithay'
+arch=('x86_64')
+url='https://github.com/iboshka24/project-tahoe'
+license=('MIT' 'Apache-2.0')
+depends=('gcc-libs' 'libinput' 'libxkbcommon' 'wayland' 'mesa' 'seatd')
+makedepends=('cargo' 'git')
+source=("git+https://github.com/iboshka24/project-tahoe.git#tag=v$pkgver")
+sha256sums=('SKIP')
+
+build() {
+	cd "project-tahoe"
+	cargo build --release --locked -p tahoe-compositor
+}
+
+package() {
+	cd "project-tahoe"
+	install -Dm755 "target/release/tahoe-compositor" "$pkgdir/usr/bin/tahoe-compositor"
+	install -Dm644 "binfmt.d/wine.conf" "$pkgdir/usr/lib/binfmt.d/tahoe-wine.conf"
+}

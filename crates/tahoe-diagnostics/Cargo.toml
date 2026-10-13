@@ -1,0 +1,6 @@
+[package]
+name = "tahoe-diagnostics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Read-only system probes for Project Tahoe: binfmt_misc, layers, kernel features"

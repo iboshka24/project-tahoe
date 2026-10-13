@@ -1,0 +1,26 @@
+[package]
+name = "tahoe-compositor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Tahoe Wayland compositor on Smithay 0.7 (winit backend for development; TTY backend planned)"
+
+[[bin]]
+name = "tahoe-compositor"
+path = "src/main.rs"
+
+[dependencies]
+smithay = { version = "0.7", default-features = false, features = [
+    "backend_winit",
+    "renderer_gl",
+    "wayland_frontend",
+    "desktop",
+] }
+
+[features]
+default = []
+# Full TTY stack (DRM/KMS + libinput + libseat + udev). Verified to compile
+# on the reference machine; runtime testing needs a real VT (roadmap stage 1).
+tty = ["smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_egl",
+       "smithay/backend_libinput", "smithay/backend_session_libseat",
+       "smithay/backend_udev", "smithay/renderer_multi", "smithay/xwayland"]
