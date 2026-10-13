@@ -1,330 +1,315 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! `tahoe-compositor`: the Tahoe Wayland compositor.
+//! `tahoe-compositor` entry point.
 //!
-//! Status (foundation stage): a minimal Smithay 0.7 compositor that opens a
-//! window via the `winit` backend, serves xdg-shell clients over a Wayland
-//! socket, and renders their surfaces. Structure follows Smithay 0.7's own
-//! `examples/minimal.rs` (same handler set, same delegate macros), so the
-//! code tracks the released API instead of inventing one.
+//! Two backends, one protocol surface:
 //!
-//! Run nested for development:
-//!
-//! ```sh
-//! cargo run -p tahoe-compositor -- tahoe-0
+//! ```text
+//! tahoe-compositor --backend headless --socket /tmp/tahoe.sock --describe
+//! tahoe-compositor --backend winit
 //! ```
 //!
-//! Then point a client at it with `WAYLAND_DISPLAY=tahoe-0`.
+//! `headless` serves real Wayland clients with no display attached; it is
+//! what the test suite and CI use. `winit` opens a nested window and
+//! renders the real desktop.
 
-use std::{os::unix::io::OwnedFd, sync::Arc};
+use std::time::Duration;
 
-use smithay::{
-    backend::{
-        input::{InputEvent, KeyboardKeyEvent},
-        renderer::{
-            Color32F, Frame, Renderer,
-            element::{
-                Kind,
-                surface::{WaylandSurfaceRenderElement, render_elements_from_surface_tree},
-            },
-            gles::GlesRenderer,
-            utils::{draw_render_elements, on_commit_buffer_handler},
-        },
-        winit::{self, WinitEvent},
-    },
-    delegate_compositor, delegate_data_device, delegate_seat, delegate_shm, delegate_xdg_shell,
-    input::{Seat, SeatHandler, SeatState, keyboard::FilterResult},
-    reexports::{
-        wayland_protocols::xdg::shell::server::xdg_toplevel,
-        wayland_server::{
-            Client, Display, ListeningSocket,
-            backend::{ClientData, ClientId, DisconnectReason},
-            protocol::{
-                wl_buffer, wl_seat,
-                wl_surface::{self, WlSurface},
-            },
-        },
-        winit::platform::pump_events::PumpStatus,
-    },
-    utils::{Rectangle, Serial, Transform},
-    wayland::{
-        buffer::BufferHandler,
-        compositor::{
-            CompositorClientState, CompositorHandler, CompositorState, SurfaceAttributes,
-            TraversalAction, with_surface_tree_downward,
-        },
-        selection::{
-            SelectionHandler,
-            data_device::{
-                ClientDndGrabHandler, DataDeviceHandler, DataDeviceState, ServerDndGrabHandler,
-            },
-        },
-        shell::xdg::{
-            PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
-        },
-        shm::{ShmHandler, ShmState},
-    },
-};
+use tahoe_compositor::backend::{SocketSpec, headless::HeadlessCompositor};
+use tracing_subscriber::EnvFilter;
 
-impl BufferHandler for Tahoe {
-    fn buffer_destroyed(&mut self, _buffer: &wl_buffer::WlBuffer) {}
+/// Parsed command line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Args {
+    backend: Backend,
+    socket: Option<String>,
+    size: (i32, i32),
+    exit_after: Option<Duration>,
+    describe: bool,
+    appearance: Option<Appearance>,
+    no_panel: bool,
 }
 
-impl XdgShellHandler for Tahoe {
-    fn xdg_shell_state(&mut self) -> &mut XdgShellState {
-        &mut self.xdg_shell_state
-    }
-
-    fn new_toplevel(&mut self, surface: ToplevelSurface) {
-        surface.with_pending_state(|state| {
-            state.states.set(xdg_toplevel::State::Activated);
-        });
-        surface.send_configure();
-    }
-
-    fn new_popup(&mut self, _surface: PopupSurface, _positioner: PositionerState) {
-        // Popups render as part of the surface tree; no extra tracking yet.
-    }
-
-    fn grab(&mut self, _surface: PopupSurface, _seat: wl_seat::WlSeat, _serial: Serial) {}
-
-    fn reposition_request(
-        &mut self,
-        _surface: PopupSurface,
-        _positioner: PositionerState,
-        _token: u32,
-    ) {
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Backend {
+    Winit,
+    Headless,
 }
 
-impl SelectionHandler for Tahoe {
-    type SelectionUserData = ();
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Appearance {
+    Light,
+    Dark,
 }
 
-impl DataDeviceHandler for Tahoe {
-    fn data_device_state(&self) -> &DataDeviceState {
-        &self.data_device_state
+const USAGE: &str = "\
+tahoe-compositor — Tahoe Wayland compositor
+
+USAGE:
+    tahoe-compositor [OPTIONS]
+
+OPTIONS:
+    --backend <winit|headless>   Where frames go (default: winit)
+    --socket <name|path>         Wayland socket (default: tahoe-0)
+    --size <WxH>                 Output size (default: 1440x900)
+    --exit-after <seconds>       Quit automatically (smoke tests)
+    --describe                   Print state, then exit
+    --appearance <light|dark>    Override the design system appearance
+    --no-panel                   Do not draw the reserved panel strip
+    -h, --help                   Show this text
+
+EXAMPLES:
+    tahoe-compositor --backend headless --socket /tmp/tahoe.sock --exit-after 5
+    WAYLAND_DISPLAY=tahoe-0 foot
+";
+
+fn parse_size(value: &str) -> Result<(i32, i32), String> {
+    let (w, h) = value
+        .split_once(['x', 'X'])
+        .ok_or_else(|| format!("bad size: {value}"))?;
+    let w: i32 = w
+        .trim()
+        .parse()
+        .map_err(|_| format!("bad width in {value}"))?;
+    let h: i32 = h
+        .trim()
+        .parse()
+        .map_err(|_| format!("bad height in {value}"))?;
+    if w <= 0 || h <= 0 {
+        return Err(format!("size must be positive: {value}"));
     }
+    Ok((w, h))
 }
 
-impl ClientDndGrabHandler for Tahoe {}
-impl ServerDndGrabHandler for Tahoe {
-    fn send(&mut self, _mime_type: String, _fd: OwnedFd, _seat: Seat<Self>) {}
+fn parse_args(argv: impl IntoIterator<Item = String>) -> Result<Args, String> {
+    let mut args = Args {
+        backend: Backend::Winit,
+        socket: None,
+        size: (1440, 900),
+        exit_after: None,
+        describe: false,
+        appearance: None,
+        no_panel: false,
+    };
+    let mut it = argv.into_iter();
+    while let Some(arg) = it.next() {
+        match arg.as_str() {
+            "-h" | "--help" => return Err(USAGE.to_owned()),
+            "--backend" => {
+                let v = it.next().ok_or("--backend needs a value")?;
+                args.backend = match v.as_str() {
+                    "winit" => Backend::Winit,
+                    "headless" => Backend::Headless,
+                    other => return Err(format!("unknown backend: {other}")),
+                };
+            }
+            "--socket" => args.socket = Some(it.next().ok_or("--socket needs a value")?),
+            "--size" => {
+                args.size = parse_size(&it.next().ok_or("--size needs a value")?)?;
+            }
+            "--exit-after" => {
+                let v = it.next().ok_or("--exit-after needs a value")?;
+                let secs: f64 = v.parse().map_err(|_| format!("bad seconds: {v}"))?;
+                if !secs.is_finite() || secs < 0.0 {
+                    return Err(format!("bad seconds: {v}"));
+                }
+                args.exit_after = Some(Duration::from_secs_f64(secs));
+            }
+            "--describe" => args.describe = true,
+            "--no-panel" => args.no_panel = true,
+            "--appearance" => {
+                let v = it.next().ok_or("--appearance needs a value")?;
+                args.appearance = Some(match v.as_str() {
+                    "light" => Appearance::Light,
+                    "dark" => Appearance::Dark,
+                    other => return Err(format!("unknown appearance: {other}")),
+                });
+            }
+            other => return Err(format!("unknown argument: {other}\n\n{USAGE}")),
+        }
+    }
+    Ok(args)
 }
 
-impl CompositorHandler for Tahoe {
-    fn compositor_state(&mut self) -> &mut CompositorState {
-        &mut self.compositor_state
-    }
-
-    fn client_compositor_state<'a>(&self, client: &'a Client) -> &'a CompositorClientState {
-        &client.get_data::<ClientState>().unwrap().compositor_state
-    }
-
-    fn commit(&mut self, surface: &WlSurface) {
-        on_commit_buffer_handler::<Self>(surface);
-    }
-}
-
-impl ShmHandler for Tahoe {
-    fn shm_state(&self) -> &ShmState {
-        &self.shm_state
-    }
-}
-
-impl SeatHandler for Tahoe {
-    type KeyboardFocus = WlSurface;
-    type PointerFocus = WlSurface;
-    type TouchFocus = WlSurface;
-
-    fn seat_state(&mut self) -> &mut SeatState<Self> {
-        &mut self.seat_state
-    }
-
-    fn focus_changed(&mut self, _seat: &Seat<Self>, _focused: Option<&WlSurface>) {}
-    fn cursor_image(
-        &mut self,
-        _seat: &Seat<Self>,
-        _image: smithay::input::pointer::CursorImageStatus,
-    ) {
+fn socket_spec(args: &Args) -> SocketSpec {
+    match &args.socket {
+        Some(s) if s.starts_with('/') => SocketSpec::Path(s.into()),
+        Some(name) => SocketSpec::Named(name.clone()),
+        None => SocketSpec::Named("tahoe-0".to_owned()),
     }
 }
 
-struct Tahoe {
-    compositor_state: CompositorState,
-    xdg_shell_state: XdgShellState,
-    shm_state: ShmState,
-    seat_state: SeatState<Self>,
-    data_device_state: DataDeviceState,
-    seat: Seat<Self>,
-}
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let socket = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "tahoe-0".to_owned());
-    run_winit(&socket)
-}
-
-fn run_winit(socket: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut display: Display<Tahoe> = Display::new()?;
-    let dh = display.handle();
-
-    let compositor_state = CompositorState::new::<Tahoe>(&dh);
-    let shm_state = ShmState::new::<Tahoe>(&dh, vec![]);
-    let mut seat_state = SeatState::new();
-    let seat = seat_state.new_wl_seat(&dh, "tahoe-winit");
-
-    let mut state = Tahoe {
-        compositor_state,
-        xdg_shell_state: XdgShellState::new::<Tahoe>(&dh),
-        shm_state,
-        seat_state,
-        data_device_state: DataDeviceState::new::<Tahoe>(&dh),
-        seat,
+fn main() {
+    let args = match parse_args(std::env::args().skip(1)) {
+        Ok(args) => args,
+        Err(message) => {
+            // `--help` lands here too: it is not an error, but it is not a
+            // runnable configuration either.
+            if message.starts_with("tahoe-compositor —") {
+                println!("{message}");
+                return;
+            }
+            eprintln!("{message}");
+            std::process::exit(2);
+        }
     };
 
-    let listener = ListeningSocket::bind(socket)?;
-    let mut clients = Vec::new();
-
-    let (mut backend, mut winit) = winit::init::<GlesRenderer>()?;
-
-    let start_time = std::time::Instant::now();
-    let keyboard = state.seat.add_keyboard(Default::default(), 200, 200)?;
-
-    // Best-effort demo client: try common terminals, ignore failures.
-    unsafe {
-        std::env::set_var("WAYLAND_DISPLAY", socket);
-    }
-    for term in ["foot", "weston-terminal", "xterm"] {
-        if std::process::Command::new(term).spawn().is_ok() {
-            break;
+    match args.appearance {
+        Some(Appearance::Light) => {
+            // SAFETY: single-threaded, before any worker starts.
+            unsafe { std::env::set_var("TAHOE_APPEARANCE", "light") };
         }
-    }
-    eprintln!("tahoe-compositor: socket WAYLAND_DISPLAY={socket}");
-
-    loop {
-        let status = winit.dispatch_new_events(|event| match event {
-            WinitEvent::Resized { .. } => {}
-            WinitEvent::Input(event) => match event {
-                InputEvent::Keyboard { event } => {
-                    keyboard.input::<(), _>(
-                        &mut state,
-                        event.key_code(),
-                        event.state(),
-                        0.into(),
-                        0,
-                        |_, _, _| FilterResult::Forward,
-                    );
-                }
-                InputEvent::PointerMotionAbsolute { .. } => {
-                    if let Some(surface) = state
-                        .xdg_shell_state
-                        .toplevel_surfaces()
-                        .iter()
-                        .next()
-                        .cloned()
-                    {
-                        let surface = surface.wl_surface().clone();
-                        keyboard.set_focus(&mut state, Some(surface), 0.into());
-                    }
-                }
-                _ => {}
-            },
-            _ => (),
-        });
-
-        match status {
-            PumpStatus::Continue => (),
-            PumpStatus::Exit(_) => return Ok(()),
+        Some(Appearance::Dark) => {
+            unsafe { std::env::set_var("TAHOE_APPEARANCE", "dark") };
         }
+        None => {}
+    }
 
-        let size = backend.window_size();
-        let damage = Rectangle::from_size(size);
-        {
-            let (renderer, mut framebuffer) = backend.bind()?;
-            let elements = state
-                .xdg_shell_state
-                .toplevel_surfaces()
-                .iter()
-                .flat_map(|surface| {
-                    render_elements_from_surface_tree(
-                        renderer,
-                        surface.wl_surface(),
-                        (0, 0),
-                        1.0,
-                        1.0,
-                        Kind::Unspecified,
-                    )
-                })
-                .collect::<Vec<WaylandSurfaceRenderElement<GlesRenderer>>>();
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .init();
 
-            let mut frame = renderer.render(&mut framebuffer, size, Transform::Flipped180)?;
-            frame.clear(Color32F::new(0.1, 0.0, 0.0, 1.0), &[damage])?;
-            draw_render_elements(&mut frame, 1.0, &elements, &[damage])?;
-            // The nested compositor handles sync for us.
-            let _ = frame.finish()?;
-
-            for surface in state.xdg_shell_state.toplevel_surfaces() {
-                send_frames_surface_tree(
-                    surface.wl_surface(),
-                    start_time.elapsed().as_millis() as u32,
-                );
-            }
-
-            if let Some(stream) = listener.accept()? {
-                let client = display
-                    .handle()
-                    .insert_client(stream, Arc::new(ClientState::default()))?;
-                clients.push(client);
-            }
-
-            display.dispatch_clients(&mut state)?;
-            display.flush_clients()?;
-        }
-
-        // Dispatch and flush before swapping: submit may block.
-        backend.submit(Some(&[damage]))?;
+    let result = match args.backend {
+        Backend::Headless => run_headless(&args),
+        Backend::Winit => run_winit(&args),
+    };
+    if let Err(error) = result {
+        eprintln!("tahoe-compositor: {error}");
+        std::process::exit(1);
     }
 }
 
-/// Drain frame callbacks across a surface tree (from Smithay's minimal example).
-pub fn send_frames_surface_tree(surface: &wl_surface::WlSurface, time: u32) {
-    with_surface_tree_downward(
-        surface,
-        (),
-        |_, _, &()| TraversalAction::DoChildren(()),
-        |_surf, states, &()| {
-            for callback in states
-                .cached_state
-                .get::<SurfaceAttributes>()
-                .current()
-                .frame_callbacks
-                .drain(..)
-            {
-                callback.done(time);
-            }
-        },
-        |_, _, &()| true,
-    );
+fn run_headless(args: &Args) -> Result<(), String> {
+    let mut compositor =
+        HeadlessCompositor::bind(socket_spec(args), args.size.into()).map_err(|e| e.to_string())?;
+    if let Some(path) = compositor.socket_path() {
+        println!("WAYLAND_DISPLAY={}", path.display());
+    } else if let SocketSpec::Named(name) = socket_spec(args) {
+        println!("WAYLAND_DISPLAY={name}");
+    }
+    if args.describe {
+        print!("{}", compositor.state.describe());
+        return Ok(());
+    }
+    let deadline = args.exit_after.map(|d| std::time::Instant::now() + d);
+    compositor
+        .run(|state| {
+            deadline.is_some_and(|d| std::time::Instant::now() >= d)
+                || state.stats.toplevels_created > 0
+        })
+        .map_err(|e| e.to_string())?;
+    print!("{}", compositor.state.describe());
+    Ok(())
 }
 
-#[derive(Default)]
-struct ClientState {
-    compositor_state: CompositorClientState,
+#[cfg(feature = "winit")]
+fn run_winit(args: &Args) -> Result<(), String> {
+    let options = tahoe_compositor::backend::winit::Options {
+        exit_after: args.exit_after,
+        draw_panel: !args.no_panel,
+        force_light: matches!(args.appearance, Some(Appearance::Light)),
+    };
+    tahoe_compositor::backend::winit::run(socket_spec(args), options).map_err(|e| e.to_string())
 }
 
-impl ClientData for ClientState {
-    fn initialized(&self, _client_id: ClientId) {
-        eprintln!("tahoe-compositor: client initialized");
+#[cfg(not(feature = "winit"))]
+fn run_winit(_args: &Args) -> Result<(), String> {
+    Err("this build was compiled without the `winit` feature; use --backend headless".to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(list: &[&str]) -> Result<Args, String> {
+        parse_args(list.iter().map(|s| (*s).to_owned()))
     }
 
-    fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {
-        eprintln!("tahoe-compositor: client disconnected");
+    #[test]
+    fn defaults_are_sane() {
+        let a = args(&[]).unwrap();
+        assert_eq!(a.backend, Backend::Winit);
+        assert_eq!(a.size, (1440, 900));
+        assert!(a.exit_after.is_none());
+        assert!(!a.describe);
+    }
+
+    #[test]
+    fn parses_headless_with_path_socket() {
+        let a = args(&["--backend", "headless", "--socket", "/tmp/x.sock"]).unwrap();
+        assert_eq!(a.backend, Backend::Headless);
+        assert_eq!(socket_spec(&a), SocketSpec::Path("/tmp/x.sock".into()));
+    }
+
+    #[test]
+    fn relative_socket_is_a_name() {
+        let a = args(&["--socket", "wayland-7"]).unwrap();
+        assert_eq!(socket_spec(&a), SocketSpec::Named("wayland-7".into()));
+    }
+
+    #[test]
+    fn default_socket_is_tahoe_0() {
+        assert_eq!(
+            socket_spec(&args(&[]).unwrap()),
+            SocketSpec::Named("tahoe-0".into())
+        );
+    }
+
+    #[test]
+    fn parses_size_in_both_separators() {
+        assert_eq!(args(&["--size", "800x600"]).unwrap().size, (800, 600));
+        assert_eq!(args(&["--size", "1920X1080"]).unwrap().size, (1920, 1080));
+    }
+
+    #[test]
+    fn rejects_bad_sizes() {
+        assert!(parse_size("800").is_err());
+        assert!(parse_size("0x100").is_err());
+        assert!(parse_size("-4x10").is_err());
+        assert!(parse_size("axb").is_err());
+    }
+
+    #[test]
+    fn parses_exit_after_fractional_seconds() {
+        let a = args(&["--exit-after", "0.25"]).unwrap();
+        assert_eq!(a.exit_after, Some(Duration::from_millis(250)));
+    }
+
+    #[test]
+    fn rejects_negative_or_nan_seconds() {
+        assert!(args(&["--exit-after", "-1"]).is_err());
+        assert!(args(&["--exit-after", "nan"]).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_backend_and_flags() {
+        assert!(args(&["--backend", "x11"]).is_err());
+        assert!(args(&["--wat"]).is_err());
+        assert!(args(&["--socket"]).is_err());
+    }
+
+    #[test]
+    fn help_is_returned_not_panicked() {
+        let err = args(&["--help"]).unwrap_err();
+        assert!(err.contains("USAGE"));
+    }
+
+    #[test]
+    fn appearance_parses() {
+        assert_eq!(
+            args(&["--appearance", "light"]).unwrap().appearance,
+            Some(Appearance::Light)
+        );
+        assert_eq!(
+            args(&["--appearance", "dark"]).unwrap().appearance,
+            Some(Appearance::Dark)
+        );
+        assert!(args(&["--appearance", "sepia"]).is_err());
+    }
+
+    #[test]
+    fn no_panel_flag() {
+        assert!(args(&["--no-panel"]).unwrap().no_panel);
     }
 }
-
-delegate_xdg_shell!(Tahoe);
-delegate_compositor!(Tahoe);
-delegate_shm!(Tahoe);
-delegate_seat!(Tahoe);
-delegate_data_device!(Tahoe);

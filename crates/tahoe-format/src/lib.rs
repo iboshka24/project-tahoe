@@ -321,7 +321,7 @@ fn probe_pe(buf: &[u8]) -> ProbeReport {
     let Ok(hdr) = usize::try_from(lfanew) else {
         return base;
     };
-    let Some(sig) = buf.get(hdr..hdr.checked_add(6).unwrap_or(usize::MAX)) else {
+    let Some(sig) = buf.get(hdr..hdr.saturating_add(6)) else {
         return base;
     };
     if sig.len() < 6 || sig[0] != b'P' || sig[1] != b'E' || sig[2] != 0 || sig[3] != 0 {

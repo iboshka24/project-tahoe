@@ -6,6 +6,9 @@
 //! view layer (smithay-client-toolkit, layer-shell surfaces) will render
 //! snapshots of this model and forward events back into it.
 
+pub mod design;
+pub mod preview;
+
 use std::collections::BTreeMap;
 
 /// An application identity: the basename of its `.desktop` file.

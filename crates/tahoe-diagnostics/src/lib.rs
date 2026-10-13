@@ -41,7 +41,7 @@ pub struct KernelFacts {
 /// Parse `(major, minor, patch)` from a release like `6.18.55-1-cachyos-lts`.
 #[must_use]
 pub fn parse_kernel_version(release: &str) -> Option<(u64, u64, u64)> {
-    let mut parts = release.split(|c| c == '.' || c == '-');
+    let mut parts = release.split(['.', '-']);
     let major = parts.next()?.parse().ok()?;
     let minor = parts.next()?.parse().ok()?;
     let patch = parts.next()?.parse().ok()?;

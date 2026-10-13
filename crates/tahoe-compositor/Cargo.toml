@@ -3,24 +3,38 @@ name = "tahoe-compositor"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Tahoe Wayland compositor on Smithay 0.7 (winit backend for development; TTY backend planned)"
+description = "Tahoe Wayland compositor on Smithay 0.7 (headless + nested winit backends today, DRM/KMS planned)"
+
+[features]
+default = ["winit"]
+# Nested-in-a-window development backend. Enabled by default because it is
+# the only backend a developer on an existing desktop can run.
+winit = ["smithay/backend_winit", "smithay/renderer_gl", "smithay/desktop"]
+# Full TTY stack (DRM/KMS + libinput + libseat + udev + Xwayland). Verified
+# to compile; not yet wired into `main`. See docs/limitations.md.
+tty = [
+    "smithay/backend_drm",
+    "smithay/backend_gbm",
+    "smithay/backend_egl",
+    "smithay/backend_libinput",
+    "smithay/backend_session_libseat",
+    "smithay/backend_udev",
+    "smithay/renderer_multi",
+    "smithay/xwayland",
+]
+
+[dependencies]
+smithay = { version = "0.7", default-features = false, features = [
+    "wayland_frontend",
+] }
+tahoe-shell = { path = "../tahoe-shell" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "unstable", "staging"] }
 
 [[bin]]
 name = "tahoe-compositor"
 path = "src/main.rs"
-
-[dependencies]
-smithay = { version = "0.7", default-features = false, features = [
-    "backend_winit",
-    "renderer_gl",
-    "wayland_frontend",
-    "desktop",
-] }
-
-[features]
-default = []
-# Full TTY stack (DRM/KMS + libinput + libseat + udev). Verified to compile
-# on the reference machine; runtime testing needs a real VT (roadmap stage 1).
-tty = ["smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_egl",
-       "smithay/backend_libinput", "smithay/backend_session_libseat",
-       "smithay/backend_udev", "smithay/renderer_multi", "smithay/xwayland"]
