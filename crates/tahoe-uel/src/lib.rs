@@ -9,6 +9,8 @@
 //! is unit-testable without Wine, Darling, or root.
 
 use std::path::{Path, PathBuf};
+
+pub mod supervisor;
 use tahoe_core::{Arch, ObjectFormat};
 use tahoe_format::{FormatDetail, ProbeReport, probe_file};
 
@@ -87,9 +89,16 @@ pub enum Strategy {
         backend: EmulatorBackend,
     },
     /// Script run via its `#!` interpreter.
+    ///
+    /// The arguments exist because a shebang may carry them: Linux splits
+    /// `#!/usr/bin/env python3` into the program `/usr/bin/env` and the
+    /// argument `python3`, and a plan that forgot the split would try to
+    /// exec a file literally named `/usr/bin/env python3`.
     Script {
-        /// Interpreter path as written in the file.
+        /// Interpreter to execute.
         interpreter: PathBuf,
+        /// Arguments the interpreter receives before the script.
+        interpreter_args: Vec<String>,
     },
     /// Refuse, with a reason a human can act on.
     Rejected {
@@ -159,6 +168,18 @@ pub enum Confidence {
     Speculative,
     /// Do not attempt.
     Refused,
+}
+
+impl std::fmt::Display for Confidence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Verified => write!(f, "verified"),
+            Self::Plausible => write!(f, "plausible"),
+            Self::Layer { layer, .. } => write!(f, "layer:{layer}"),
+            Self::Speculative => write!(f, "speculative"),
+            Self::Refused => write!(f, "refused"),
+        }
+    }
 }
 
 /// A strategy paired with the UEL's confidence in it.
@@ -262,13 +283,17 @@ pub fn decide(
         ObjectFormat::Pe => decide_pe(report, host, policy, source),
         ObjectFormat::MachO | ObjectFormat::FatMachO => decide_macho(report, host, policy, source),
         ObjectFormat::Script => match &report.detail {
-            FormatDetail::Script { interpreter } if !interpreter.is_empty() => plan(
-                Strategy::Script {
-                    interpreter: PathBuf::from(interpreter),
-                },
-                Confidence::Plausible,
-                format!("{}: script via {interpreter}", source.display()),
-            ),
+            FormatDetail::Script { interpreter } if !interpreter.is_empty() => {
+                let (program, args) = tahoe_format::split_shebang(interpreter);
+                plan(
+                    Strategy::Script {
+                        interpreter: PathBuf::from(&program),
+                        interpreter_args: args,
+                    },
+                    Confidence::Plausible,
+                    format!("{}: script via {interpreter}", source.display()),
+                )
+            }
             _ => refused(
                 RejectionReason::UnknownFormat,
                 format!(

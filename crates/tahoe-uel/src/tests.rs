@@ -333,7 +333,8 @@ fn script_runs_via_interpreter() {
     assert_eq!(
         plan.strategy,
         Strategy::Script {
-            interpreter: PathBuf::from("/bin/sh")
+            interpreter: PathBuf::from("/bin/sh"),
+            interpreter_args: Vec::new()
         }
     );
     assert_eq!(plan.confidence, Confidence::Plausible);

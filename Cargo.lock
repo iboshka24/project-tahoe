@@ -1615,6 +1615,7 @@ version = "0.1.0"
 name = "tahoe-uel"
 version = "0.1.0"
 dependencies = [
+ "rustix 0.38.44",
  "tahoe-core",
  "tahoe-format",
 ]

@@ -124,6 +124,23 @@ impl ProbeReport {
     }
 }
 
+/// Split a `#!` interpreter line into the interpreter and its arguments.
+///
+/// Linux's `binfmt_script` splits the shebang on the first whitespace run:
+/// the first token is the interpreter to `execve`, and the remainder becomes
+/// a single argument to it. That is why `#!/usr/bin/env python3` works — and
+/// why treating the whole line as one path does not.
+///
+/// Returns the interpreter path and its arguments, both trimmed. An empty
+/// line yields an empty interpreter.
+#[must_use]
+pub fn split_shebang(line: &str) -> (String, Vec<String>) {
+    let mut parts = line.split_whitespace();
+    let interpreter = parts.next().unwrap_or_default().to_owned();
+    let args = parts.map(str::to_owned).collect();
+    (interpreter, args)
+}
+
 /// Human-readable ELF `e_type` name.
 #[must_use]
 pub fn elf_type_name(e_type: u16) -> &'static str {

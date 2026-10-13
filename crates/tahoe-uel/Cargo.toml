@@ -3,7 +3,7 @@ name = "tahoe-uel"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Universal Execution Layer: probe bytes, choose a strategy, report confidence (decide only, stage 1)"
+description = "Universal Execution Layer: identify, decide, and supervise (never guess)"
 
 [[bin]]
 name = "tahoe-uel"
@@ -12,3 +12,6 @@ path = "src/main.rs"
 [dependencies]
 tahoe-core = { path = "../tahoe-core" }
 tahoe-format = { path = "../tahoe-format" }
+# Only for `kill_process_group`: a timeout that leaves the child's own
+# children running is not a timeout. Already in the build graph via Smithay.
+rustix = { version = "0.38", features = ["process"] }
