@@ -1,0 +1,23 @@
+# Generated fixture binaries are build artifacts; regenerate with:
+#   python3 fixtures/generate.py fixtures/
+# Only the generator and docs are tracked.
+/elf64-le-exec-x86_64
+/elf64-le-dyn-x86_64
+/elf32-le-exec-x86
+/elf32-be-rel-ppc
+/elf64-core
+/appimage-type2-stub
+/pe32plus-x86_64-gui
+/pe32-x86-console
+/pe-arm64-gui
+/mz-truncated
+/macho64-x86_64
+/macho64-arm64
+/macho32-x86
+/fat-be-nfat2
+/java8-class
+/script-sh.sh
+/script-py.py
+/dmg-koly-trailer
+/empty
+/garbage
