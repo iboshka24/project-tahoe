@@ -159,6 +159,13 @@ pub enum PlanError {
     },
     /// Nothing to execute.
     EmptyProgram,
+    /// The plan is to inspect a container, which is not a launch.
+    InspectOnly {
+        /// What kind of container.
+        kind: crate::ContainerKind,
+        /// What to do with it instead.
+        hint: String,
+    },
 }
 
 impl std::fmt::Display for PlanError {
@@ -167,6 +174,9 @@ impl std::fmt::Display for PlanError {
             Self::Refused(r) => write!(f, "refused: {r:?}"),
             Self::LayerMissing { layer } => write!(f, "{layer} is not installed"),
             Self::EmptyProgram => write!(f, "empty program path"),
+            Self::InspectOnly { kind, hint } => {
+                write!(f, "{kind} is a container, not a program: {hint}")
+            }
         }
     }
 }
@@ -226,6 +236,43 @@ pub fn plan_command(
                 .push(("WINEDLLOVERRIDES".into(), "mscoree,mshtml=".into()));
             Ok(cmd)
         }
+        Strategy::WineInstaller { prefix, package } => {
+            // `msiexec` is a Windows program, so it runs *through* wine.
+            let wine = need("wine", layers.wine.as_deref())?;
+            let mut cmd = plain(
+                vec![
+                    wine,
+                    "msiexec".into(),
+                    "/i".into(),
+                    package.as_os_str().to_owned(),
+                ],
+                Some("wine-msiexec"),
+            );
+            cmd.env
+                .push(("WINEPREFIX".into(), prefix.as_os_str().to_owned()));
+            cmd.env
+                .push(("WINEDLLOVERRIDES".into(), "mscoree,mshtml=".into()));
+            Ok(cmd)
+        }
+        Strategy::MacBundle {
+            prefix, executable, ..
+        } => {
+            let darling = need("darling", layers.darling.as_deref())?;
+            let mut cmd = plain(
+                vec![darling, executable.as_os_str().to_owned()],
+                Some("darling"),
+            );
+            cmd.env
+                .push(("DPREFIX".into(), prefix.as_os_str().to_owned()));
+            Ok(cmd)
+        }
+        Strategy::Inspect { kind, hint } => {
+            // A container is data. There is deliberately no command.
+            Err(PlanError::InspectOnly {
+                kind: *kind,
+                hint: hint.clone(),
+            })
+        }
         Strategy::Darling { prefix } => {
             // UNVERIFIED against a real Darling install: documented usage is
             // `darling <command>`, and every reference here is upstream's
@@ -256,7 +303,14 @@ pub struct LaunchPolicy {
     /// Kill the process group after this long. `None` means no limit, which
     /// is only appropriate for a program the user is watching interactively.
     pub timeout: Option<Duration>,
-    /// Maximum bytes captured from each of stdout and stderr.
+    /// Whether to capture stdout and stderr at all.
+    ///
+    /// Capturing costs two reader threads and two pipes. A Dock launch does
+    /// not need them, and the benchmark shows they are most of the
+    /// supervisor's remaining overhead; a diagnostic run very much does.
+    pub capture: bool,
+    /// Maximum bytes captured from each of stdout and stderr when
+    /// [`LaunchPolicy::capture`] is set.
     pub capture_limit: usize,
     /// Extra variables the caller vouches for, added to [`ENV_WHITELIST`].
     ///
@@ -270,6 +324,7 @@ impl Default for LaunchPolicy {
     fn default() -> Self {
         Self {
             timeout: Some(Duration::from_secs(300)),
+            capture: true,
             capture_limit: 64 * 1024,
             extra_env: Vec::new(),
         }
@@ -394,8 +449,13 @@ pub fn spawn(command: &CommandPlan, policy: &LaunchPolicy) -> Result<LaunchOutco
     }
 
     cmd.stdin(Stdio::null());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
+    if policy.capture {
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
+    } else {
+        cmd.stdout(Stdio::null());
+        cmd.stderr(Stdio::null());
+    }
     // Own process group, so a timeout can take the whole tree down instead
     // of orphaning whatever the compatibility layer spawned.
     #[cfg(unix)]
@@ -408,44 +468,69 @@ pub fn spawn(command: &CommandPlan, policy: &LaunchPolicy) -> Result<LaunchOutco
     let mut child = cmd.spawn().map_err(LaunchError::Io)?;
     let pgid = rustix::process::Pid::from_raw(child.id() as i32);
 
-    let stdout = child.stdout.take();
-    let stderr = child.stderr.take();
     let limit = policy.capture_limit;
-    let stdout_reader = std::thread::spawn(move || read_capped(stdout, limit));
-    let stderr_reader = std::thread::spawn(move || read_capped(stderr, limit));
+    // The pipes must be taken *before* the child moves into the waiter
+    // thread, so they are taken here and moved into the readers.
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+    let stdout_reader = policy
+        .capture
+        .then(|| std::thread::spawn(move || read_capped(stdout_pipe, limit)));
+    let stderr_reader = policy
+        .capture
+        .then(|| std::thread::spawn(move || read_capped(stderr_pipe, limit)));
 
-    // Poll rather than block, so the deadline is honoured. A blocked
-    // `wait()` cannot be interrupted, and there is no `wait_timeout` in std.
+    // Reaping without polling.
+    //
+    // A poll loop cannot be both prompt and cheap: the kernel only wakes you
+    // when the child dies, so any sleep-based loop either adds its own sleep
+    // to every fast process or burns CPU spinning. Measured on this machine,
+    // a 5 ms sleep cost 4.7 ms per launch (444% of a bare fork+exec) and an
+    // exponential back-off still cost 2.5 ms (241%).
+    //
+    // So the wait happens in a thread, where the kernel wakes it the instant
+    // the child exits, and the deadline is enforced by `recv_timeout`. One
+    // extra thread costs tens of microseconds; the poll loop cost thousands.
+    let pid = child.id();
+    let (status_tx, status_rx) = std::sync::mpsc::channel();
+    let waiter = std::thread::spawn(move || {
+        let status = child.wait();
+        let _ = status_tx.send(status);
+    });
+
     let mut timed_out = false;
     let mut signal = None;
     let mut exit_code = None;
-    let poll = Duration::from_millis(5);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                exit_code = status.code();
-                #[cfg(unix)]
-                {
-                    use std::os::unix::process::ExitStatusExt;
-                    signal = status.signal();
-                }
-                break;
-            }
-            Ok(None) => {}
-            Err(e) => return Err(LaunchError::Io(e)),
-        }
 
-        if let Some(limit) = policy.timeout
-            && started.elapsed() >= limit
-        {
+    let received = match policy.timeout {
+        Some(limit) => status_rx.recv_timeout(limit),
+        None => status_rx
+            .recv()
+            .map_err(|_| std::sync::mpsc::RecvTimeoutError::Disconnected),
+    };
+
+    match received {
+        Ok(Ok(status)) => {
+            exit_code = status.code();
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                signal = status.signal();
+            }
+        }
+        Ok(Err(_)) => {}
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
             timed_out = true;
+            // Take the whole group down: killing only the direct child of a
+            // compatibility layer leaves orphans holding the display.
             if let Some(pgid) = pgid {
-                // A negative pid targets the whole group, so whatever the
-                // compatibility layer spawned dies with it.
                 let _ = rustix::process::kill_process_group(pgid, rustix::process::Signal::Kill);
             }
-            let _ = child.kill();
-            if let Ok(status) = child.wait() {
+            if let Some(pid) = rustix::process::Pid::from_raw(pid as i32) {
+                let _ = rustix::process::kill_process(pid, rustix::process::Signal::Kill);
+            }
+            // Reap, so the child does not linger as a zombie.
+            if let Ok(Ok(status)) = status_rx.recv() {
                 exit_code = status.code();
                 #[cfg(unix)]
                 {
@@ -453,13 +538,17 @@ pub fn spawn(command: &CommandPlan, policy: &LaunchPolicy) -> Result<LaunchOutco
                     signal = status.signal();
                 }
             }
-            break;
         }
-        std::thread::sleep(poll);
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {}
     }
+    let _ = waiter.join();
 
-    let (stdout, stdout_truncated) = stdout_reader.join().unwrap_or_default();
-    let (stderr, stderr_truncated) = stderr_reader.join().unwrap_or_default();
+    let (stdout, stdout_truncated) = stdout_reader
+        .map(|h| h.join().unwrap_or_default())
+        .unwrap_or_default();
+    let (stderr, stderr_truncated) = stderr_reader
+        .map(|h| h.join().unwrap_or_default())
+        .unwrap_or_default();
 
     Ok(LaunchOutcome {
         exit_code,

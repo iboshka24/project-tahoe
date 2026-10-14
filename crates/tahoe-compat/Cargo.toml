@@ -1,0 +1,14 @@
+[package]
+name = "tahoe-compat"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Compatibility services for Tahoe: Wine prefixes, macOS bundles, Mach-O inspection, rootless binfmt_misc dispatch"
+
+[[bin]]
+name = "tahoe-compat"
+path = "src/main.rs"
+
+[dependencies]
+tahoe-core = { path = "../tahoe-core" }
+tahoe-format = { path = "../tahoe-format" }

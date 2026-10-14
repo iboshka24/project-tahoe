@@ -3,6 +3,7 @@ members = [
     "crates/tahoe-core",
     "crates/tahoe-format",
     "crates/tahoe-uel",
+    "crates/tahoe-compat",
     "crates/tahoe-compositor",
     "crates/tahoe-shell",
     "crates/tahoe-diagnostics",

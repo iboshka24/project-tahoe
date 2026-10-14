@@ -56,6 +56,7 @@ fn run(script: &str, policy: &LaunchPolicy) -> LaunchOutcome {
 fn fast() -> LaunchPolicy {
     LaunchPolicy {
         timeout: Some(Duration::from_secs(10)),
+        capture: true,
         capture_limit: 64 * 1024,
         extra_env: vec![],
     }
@@ -306,6 +307,7 @@ fn arguments_are_never_interpreted_by_a_shell() {
 fn timeout_kills_the_child_and_reports_it() {
     let policy = LaunchPolicy {
         timeout: Some(Duration::from_millis(150)),
+        capture: true,
         capture_limit: 4096,
         extra_env: vec![],
     };
@@ -332,6 +334,7 @@ fn timeout_kills_grandchildren_too() {
     let script = format!("( sleep 2; printf alive > {} ) & wait", marker.display());
     let policy = LaunchPolicy {
         timeout: Some(Duration::from_millis(150)),
+        capture: true,
         capture_limit: 4096,
         extra_env: vec![],
     };
@@ -351,6 +354,7 @@ fn timeout_kills_grandchildren_too() {
 fn a_timeout_of_none_does_not_kill() {
     let policy = LaunchPolicy {
         timeout: None,
+        capture: true,
         capture_limit: 4096,
         extra_env: vec![],
     };
@@ -363,6 +367,7 @@ fn a_timeout_of_none_does_not_kill() {
 fn a_fast_command_is_not_killed_even_with_a_tiny_budget() {
     let policy = LaunchPolicy {
         timeout: Some(Duration::from_millis(500)),
+        capture: true,
         capture_limit: 4096,
         extra_env: vec![],
     };
@@ -379,6 +384,7 @@ fn a_fast_command_is_not_killed_even_with_a_tiny_budget() {
 fn output_is_capped_and_the_truncation_is_reported() {
     let policy = LaunchPolicy {
         timeout: Some(Duration::from_secs(10)),
+        capture: true,
         capture_limit: 1024,
         extra_env: vec![],
     };
@@ -396,6 +402,7 @@ fn output_is_capped_and_the_truncation_is_reported() {
 fn output_under_the_limit_is_not_marked_truncated() {
     let policy = LaunchPolicy {
         timeout: Some(Duration::from_secs(10)),
+        capture: true,
         capture_limit: 4096,
         extra_env: vec![],
     };
@@ -410,6 +417,7 @@ fn a_child_writing_after_the_limit_is_not_killed_by_a_broken_pipe() {
     // normal end rather than EPIPE and a non-zero exit.
     let policy = LaunchPolicy {
         timeout: Some(Duration::from_secs(10)),
+        capture: true,
         capture_limit: 512,
         extra_env: vec![],
     };
@@ -449,6 +457,7 @@ fn path_reaches_the_child_because_it_is_whitelisted() {
 fn caller_provided_variables_are_passed() {
     let policy = LaunchPolicy {
         timeout: Some(Duration::from_secs(10)),
+        capture: true,
         capture_limit: 4096,
         extra_env: vec![("TAHOE_TEST_VAR".into(), "vouched".into())],
     };
@@ -464,6 +473,7 @@ fn policy_variables_override_plan_variables() {
     cmd.env.push(("K".into(), "from-plan".into()));
     let policy = LaunchPolicy {
         timeout: Some(Duration::from_secs(10)),
+        capture: true,
         capture_limit: 4096,
         extra_env: vec![("K".into(), "from-policy".into())],
     };

@@ -4,7 +4,7 @@
 > задачи. Правило: **в Completed попадает только то, что реально
 > проверено командой из раздела Validation.**
 
-Обновлено: 2026-10-14.
+Обновлено: 2026-10-14 (сессия 2: Universal Native Execution).
 
 ---
 
@@ -97,6 +97,27 @@
 Теперь проверяются все компоненты пути (чистая работа со строкой,
 без syscall).
 
+### Universal Native Execution (сессия 2)
+
+- **`tahoe-compat`** — новый крейт: `binfmt` (ядерная диспетчеризация),
+  `wine` (префиксы, обнаружение, `.lnk`, `winemenubuilder`), `macos`
+  (Mach-O, universal, `.app`, plist, DMG). 115 тестов.
+- **`tahoe-format`** расширен: `koly`-трейлер UDIF целиком, `blkx`-таблица
+  сжатия, XAR, OLE2/MSI, plist, `fat_arch`-таблица, дизамбигуация
+  `0xcafebabe` по правилу `file(1)`. 67 тестов.
+- **UEL**: новые стратегии `WineInstaller`, `MacBundle`, `Inspect`;
+  `Inspect` — «знаем что это и что делать», а не отказ. 68 тестов.
+- **Супервизор ускорен**: накладные расходы **4.7 мс → ~1.5 мс** на запуск.
+  Найдено и исправлено бенчмарком, а не догадкой.
+- **`tahoe-bench`** — измерительный стенд с честной границей: измеряем
+  своё, не приписываем себе производительность Wine.
+- **5 документов**: `universal-execution-research.md`,
+  `kernel-integration.md`, `windows-compatibility.md`,
+  `macos-compatibility.md`, `compatibility-matrix.md`; ADR-0008..0010.
+- **Ключевой проверенный результат**: `binfmt_misc` работает без root
+  внутри user namespace, ядро реально диспетчеризует файл нашему
+  интерпретатору, и хост не меняется. Есть сквозной тест.
+
 ## In Progress
 
 Этап 3 — GUI оболочки: панель в layer-shell, Dock, Launcher.
@@ -107,8 +128,9 @@
 
 | Блокер | Что нужно | Обходной путь сейчас |
 |---|---|---|
-| Wine не установлен | `pacman -S wine` (нужен root) | UEL честно возвращает `LayerMissing` |
-| Darling не собран | сборка из исходников, долго | То же |
+| Wine не установлен | `pacman -S wine` (нужен root) | UEL честно возвращает `LayerMissing`; ни один PE не запускался |
+| Darling не собран | сборка из исходников, долго | Ни один Mach-O не запускался |
+| DMG не монтируется | нужен внешний инструмент (7-Zip/apfs-fuse) | Трейлер и `blkx` разобраны, содержимое не извлекается |
 | `archiso` не установлен | `pacman -S archiso` | Профиль написан, ISO не собран |
 | Нет `seatd`/доступа к DRM как user | seat + права | TTY-бэкенд только компилируется |
 | `wayland-info` не видит `zwlr_layer_shell` клиента | — | layer-shell обрабатывается, но GUI-панели ещё нет |
@@ -117,7 +139,10 @@
 
 ## Next
 
-1. **Layer-shell панель**: клиент на `smithay-client-toolkit`, который
+1. **Доказать запуск на живых Wine и Darling.** Всё до `execve` уже
+   покрыто тестами; отсутствует ровно одно звено — реальный запуск.
+   `pacman -S wine`, затем `tahoe-uel run <file>.exe`.
+2. **Layer-shell панель**: клиент на `smithay-client-toolkit`, который
    рисует настоящую панель в зарезервированной полосе. Композитор уже
    обрабатывает `zwlr_layer_shell_v1` и отдаёт корректный size.
 2. **Dock и Launcher**: рендер состояния `Dock`/`LauncherIndex` в
@@ -137,7 +162,7 @@
 root и не меняет систему.
 
 ```sh
-cargo test                       # 312 тестов
+cargo test                       # 457 тестов
 cargo clippy --all-targets -- -D warnings
 cargo fmt --all -- --check
 cargo build -p tahoe-compositor  # winit

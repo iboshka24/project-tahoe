@@ -353,11 +353,61 @@ fn macho_truncated_to_magic() {
     assert_eq!(r.bits, Some(64));
 }
 
+/// A synthetic universal binary with `arches` slices at the given offsets.
+fn fat_binary(arches: &[(i32, u32, u32)]) -> Vec<u8> {
+    let mut b = vec![0xca, 0xfe, 0xba, 0xbe];
+    b.extend_from_slice(&(arches.len() as u32).to_be_bytes());
+    for (cputype, offset, size) in arches {
+        b.extend_from_slice(&cputype.to_be_bytes());
+        b.extend_from_slice(&0i32.to_be_bytes()); // cpusubtype
+        b.extend_from_slice(&offset.to_be_bytes());
+        b.extend_from_slice(&size.to_be_bytes());
+        b.extend_from_slice(&12u32.to_be_bytes()); // align
+    }
+    b
+}
+
 #[test]
-fn fat_magic_is_ambiguous_not_macho() {
-    // 0xCAFEBABE with a plausible nfat_arch is STILL ambiguous.
-    let mut b = vec![0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 2];
-    b.extend_from_slice(&[0u8; 32]);
+fn a_real_universal_binary_resolves_to_fat_macho() {
+    let mut b = fat_binary(&[(0x0100_0007, 0x1000, 0x2000), (0x0100_000C, 0x4000, 0x2000)]);
+    b.resize(0x6000, 0);
+    // Each slice begins with a 64-bit Mach-O magic.
+    b[0x1000..0x1004].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
+    b[0x4000..0x4004].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
+
+    let r = probe_bytes(&b);
+    assert_eq!(r.format, ObjectFormat::FatMachO);
+    assert_eq!(
+        r.arch,
+        Arch::X86_64,
+        "the first slice decides the reported arch"
+    );
+    assert_eq!(r.bits, Some(64));
+    assert_eq!(r.os_abi, OsAbi::MacOs);
+    match r.detail {
+        FormatDetail::FatMachO {
+            nfat_arch,
+            slices,
+            looks_like_java,
+        } => {
+            assert_eq!(nfat_arch, Some(2));
+            assert!(!looks_like_java);
+            assert_eq!(slices.len(), 2);
+            assert_eq!(slices[0].arch, Arch::X86_64);
+            assert_eq!(slices[0].offset, 0x1000);
+            assert_eq!(slices[0].size, 0x2000);
+            assert_eq!(slices[0].align, 12);
+            assert_eq!(slices[1].arch, Arch::Aarch64);
+        }
+        other => panic!("expected FatMachO detail, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_universal_binary_with_a_bad_slice_table_is_ambiguous() {
+    // Plausible count, but no slice actually starts with a Mach-O magic.
+    let mut b = fat_binary(&[(0x0100_0007, 0x1000, 0x2000)]);
+    b.resize(0x2000, 0xAA);
     let r = probe_bytes(&b);
     assert_eq!(
         r.format,
@@ -365,27 +415,74 @@ fn fat_magic_is_ambiguous_not_macho() {
             candidates: &["java-class", "fat-macho"]
         }
     );
-    assert_eq!(r.detail, FormatDetail::FatMachO { nfat_arch: Some(2) });
 }
 
 #[test]
-fn java_class_bytes_are_ambiguous() {
-    // A real Java 8 class header: CAFEBABE 0000 0034 ... — still ambiguous
-    // at the byte level, which is exactly why we refuse to guess.
+fn a_java_class_is_recognised_as_java_not_macho() {
+    // Java 8: minor 0, major 0x34 = 52, above the fat-arch plausibility
+    // window, exactly as file(1) reasons.
     let mut b = vec![0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 0x34];
-    b.extend_from_slice(&[0u8; 32]);
+    b.extend_from_slice(&[0u8; 64]);
     let r = probe_bytes(&b);
-    assert!(matches!(r.format, ObjectFormat::Ambiguous { .. }));
+    assert_eq!(r.format, ObjectFormat::JavaClass);
+    match r.detail {
+        FormatDetail::FatMachO {
+            looks_like_java,
+            nfat_arch,
+            ..
+        } => {
+            assert!(looks_like_java);
+            assert_eq!(nfat_arch, Some(52));
+        }
+        other => panic!("expected FatMachO detail, got {other:?}"),
+    }
 }
 
 #[test]
-fn fat_cigam_is_ambiguous() {
-    let mut b = vec![0xbe, 0xba, 0xfe, 0xca, 2, 0, 0, 0];
-    b.extend_from_slice(&[0u8; 32]);
-    assert!(matches!(
-        probe_bytes(&b).format,
-        ObjectFormat::Ambiguous { .. }
-    ));
+fn a_huge_nfat_arch_is_java_not_macho() {
+    let mut b = vec![0xca, 0xfe, 0xba, 0xbe, 0xff, 0xff, 0xff, 0xff];
+    b.extend_from_slice(&[0u8; 64]);
+    assert_eq!(probe_bytes(&b).format, ObjectFormat::JavaClass);
+}
+
+#[test]
+fn fat_cigam_is_parsed_with_swapped_fields() {
+    let mut b = vec![0xbe, 0xba, 0xfe, 0xca];
+    b.extend_from_slice(&1u32.to_le_bytes());
+    b.extend_from_slice(&0x0100_0007i32.to_le_bytes());
+    b.extend_from_slice(&0i32.to_le_bytes());
+    b.extend_from_slice(&0x200u32.to_le_bytes());
+    b.extend_from_slice(&0x100u32.to_le_bytes());
+    b.extend_from_slice(&12u32.to_le_bytes());
+    b.resize(0x300, 0);
+    b[0x200..0x204].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
+    let r = probe_bytes(&b);
+    assert_eq!(r.format, ObjectFormat::FatMachO);
+    match r.detail {
+        FormatDetail::FatMachO { slices, .. } => {
+            assert_eq!(slices[0].arch, Arch::X86_64);
+            assert_eq!(slices[0].offset, 0x200);
+        }
+        other => panic!("expected FatMachO detail, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_zero_arch_universal_binary_has_no_slices() {
+    let b = vec![0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 0];
+    match probe_bytes(&b).detail {
+        FormatDetail::FatMachO { slices, .. } => assert!(slices.is_empty()),
+        other => panic!("expected FatMachO detail, got {other:?}"),
+    }
+}
+
+#[test]
+fn container_formats_are_identified() {
+    assert_eq!(probe_bytes(b"xar!....").format, ObjectFormat::Xar);
+    assert_eq!(probe_bytes(b"bplist00\xd1").format, ObjectFormat::Plist);
+    let mut ole = vec![0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+    ole.extend_from_slice(&[0u8; 64]);
+    assert_eq!(probe_bytes(&ole).format, ObjectFormat::Ole2);
 }
 
 #[test]
@@ -508,7 +605,14 @@ fn probe_file_dmg_tail_koly() {
     let r = probe_file(&p).expect("probe temp file");
     std::fs::remove_file(&p).ok();
     assert_eq!(r.format, ObjectFormat::Dmg);
-    assert!(matches!(r.detail, FormatDetail::Dmg { confident: true }));
+    assert!(matches!(
+        r.detail,
+        FormatDetail::Dmg {
+            confident: true,
+            trailer: Some(_),
+            ..
+        }
+    ));
 }
 
 #[test]

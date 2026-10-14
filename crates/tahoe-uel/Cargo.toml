@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 tahoe-core = { path = "../tahoe-core" }
 tahoe-format = { path = "../tahoe-format" }
+tahoe-compat = { path = "../tahoe-compat" }
 # Only for `kill_process_group`: a timeout that leaves the child's own
 # children running is not a timeout. Already in the build graph via Smithay.
 rustix = { version = "0.38", features = ["process"] }

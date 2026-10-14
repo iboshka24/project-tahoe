@@ -184,6 +184,16 @@ pub enum ObjectFormat {
     AppImage,
     /// macOS disk image (UDIF). **Data, never executed** (ADR-0004).
     Dmg,
+    /// XAR archive: `.pkg` installers, `.xip` archives. **Data.**
+    Xar,
+    /// OLE2 compound file: `.msi` installers (and legacy Office documents).
+    /// **Data**, dispatched to an installer, never `execve`'d.
+    Ole2,
+    /// A property list: `bplist00` or XML `<plist>`. **Data.**
+    Plist,
+    /// A macOS `.app` bundle (a directory). **Container**, resolved to the
+    /// executable named by its `Info.plist`.
+    AppBundle,
     /// Script with a `#!` interpreter line.
     Script,
     /// Java class file (`CAFEBABE`).
@@ -207,6 +217,10 @@ impl fmt::Display for ObjectFormat {
             Self::FatMachO => write!(f, "fat-macho"),
             Self::AppImage => write!(f, "appimage"),
             Self::Dmg => write!(f, "dmg"),
+            Self::Xar => write!(f, "xar"),
+            Self::Ole2 => write!(f, "ole2"),
+            Self::Plist => write!(f, "plist"),
+            Self::AppBundle => write!(f, "app-bundle"),
             Self::Script => write!(f, "script"),
             Self::JavaClass => write!(f, "java-class"),
             Self::Ambiguous { candidates } => {

@@ -78,10 +78,35 @@ pub enum Strategy {
         /// Prefix to use (derived, not created here).
         prefix: PathBuf,
     },
+    /// A Windows installer package, run through `wine msiexec /i`.
+    ///
+    /// Distinct from [`Strategy::Wine`] because it is a *different* program
+    /// with different arguments, and because an installer writes to the
+    /// prefix: the caller should create the prefix before this runs.
+    WineInstaller {
+        /// Prefix to install into.
+        prefix: PathBuf,
+        /// The `.msi` file.
+        package: PathBuf,
+    },
     /// Mach-O / `.app` via Darling in its own DPREFIX (separate process).
     Darling {
         /// DPREFIX to use (derived, not created here).
         prefix: PathBuf,
+    },
+    /// A macOS `.app` bundle, resolved to the executable its `Info.plist`
+    /// names and run through Darling.
+    ///
+    /// Distinct from [`Strategy::Darling`] because the caller must run the
+    /// *inner* executable, not the bundle directory: `execve` on a
+    /// directory fails, and picking the executable by hand would be a guess.
+    MacBundle {
+        /// DPREFIX to use.
+        prefix: PathBuf,
+        /// The bundle directory, for display and for `DYLD_ROOT_PATH`.
+        bundle: PathBuf,
+        /// `Contents/MacOS/<CFBundleExecutable>`.
+        executable: PathBuf,
     },
     /// Foreign-arch binary wrapped in a user-mode emulator.
     Emulator {
@@ -100,11 +125,49 @@ pub enum Strategy {
         /// Arguments the interpreter receives before the script.
         interpreter_args: Vec<String>,
     },
+    /// A container that must be **inspected, never executed**: a disk
+    /// image or an installer archive.
+    ///
+    /// This is not a refusal in the sense of "we do not know what this is".
+    /// We know exactly what it is, and the correct action is to mount or
+    /// unpack it and look inside, and then plan for whatever we find.
+    Inspect {
+        /// What kind of container.
+        kind: ContainerKind,
+        /// What the caller should do with it, in one sentence.
+        hint: String,
+    },
     /// Refuse, with a reason a human can act on.
     Rejected {
         /// Why this file will not be executed.
         reason: RejectionReason,
     },
+}
+
+/// Container kinds the UEL can name. Mirrors `tahoe_format::ContainerKind`
+/// but is owned here so the UEL's public API does not leak another crate's
+/// enum on every match.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContainerKind {
+    /// A UDIF disk image.
+    Dmg,
+    /// A XAR archive: `.pkg` installers and `.xip` archives.
+    Xar,
+    /// An OLE2 compound file: `.msi` installers.
+    Ole2,
+    /// A property list.
+    Plist,
+}
+
+impl std::fmt::Display for ContainerKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Dmg => write!(f, "dmg"),
+            Self::Xar => write!(f, "xar"),
+            Self::Ole2 => write!(f, "ole2"),
+            Self::Plist => write!(f, "plist"),
+        }
+    }
 }
 
 /// User-mode emulator backends the UEL knows about (all MIT-licensed,
@@ -212,15 +275,46 @@ pub fn decide(
         plan(Strategy::Rejected { reason }, Confidence::Refused, summary)
     };
 
-    // DMG is data. Always. (ADR-0004)
-    if report.format == ObjectFormat::Dmg {
-        return refused(
-            RejectionReason::DmgIsNotExecutable,
-            format!(
-                "{} is a disk image: mount it read-only and probe the .app inside; never execute it",
-                source.display()
-            ),
-        );
+    // Containers are data. A disk image is mounted, an installer package is
+    // unpacked or handed to an installer, and a plist is read. None of them
+    // is ever handed to execve (ADR-0004). This is a distinct outcome from
+    // "we do not know what this is": we know exactly what it is and what to
+    // do with it.
+    match &report.format {
+        ObjectFormat::Dmg => {
+            return plan(
+                Strategy::Inspect {
+                    kind: ContainerKind::Dmg,
+                    hint: dmg_hint(report),
+                },
+                Confidence::Verified,
+                format!(
+                    "{} is a UDIF disk image: mount it read-only, then probe the .app inside",
+                    source.display()
+                ),
+            );
+        }
+        ObjectFormat::Xar => {
+            return plan(
+                Strategy::Inspect {
+                    kind: ContainerKind::Xar,
+                    hint: "a XAR archive; a .pkg payload is a compressed cpio stream and a .xip holds a pbzx stream".to_owned(),
+                },
+                Confidence::Verified,
+                format!("{} is a XAR archive: unpack it, do not execute it", source.display()),
+            );
+        }
+        ObjectFormat::Plist => {
+            return plan(
+                Strategy::Inspect {
+                    kind: ContainerKind::Plist,
+                    hint: "a property list; read it for metadata rather than running it".to_owned(),
+                },
+                Confidence::Verified,
+                format!("{} is a property list", source.display()),
+            );
+        }
+        _ => {}
     }
 
     if let ObjectFormat::Ambiguous { candidates } = &report.format {
@@ -281,7 +375,9 @@ pub fn decide(
             }
         }
         ObjectFormat::Pe => decide_pe(report, host, policy, source),
+        ObjectFormat::Ole2 => decide_msi(report, host, policy, source),
         ObjectFormat::MachO | ObjectFormat::FatMachO => decide_macho(report, host, policy, source),
+        ObjectFormat::AppBundle => decide_app_bundle(report, host, policy, source),
         ObjectFormat::Script => match &report.detail {
             FormatDetail::Script { interpreter } if !interpreter.is_empty() => {
                 let (program, args) = tahoe_format::split_shebang(interpreter);
@@ -334,6 +430,182 @@ pub fn decide(
         // non-exhaustive across crates, and doubles as a tripwire: a new
         // format variant refuses loudly instead of falling through.
         _ => refused(RejectionReason::UnknownFormat, "unreachable".to_owned()),
+    }
+}
+
+/// A one-line summary of what a DMG contains, from its parsed trailer.
+///
+/// Reports the compression methods we actually found, because LZFSE needs
+/// Apple's implementation while zlib and bzip2 do not — a distinction a
+/// user should see before being told "mount it".
+fn dmg_hint(report: &ProbeReport) -> String {
+    let FormatDetail::Dmg {
+        trailer,
+        compression,
+        ..
+    } = &report.detail
+    else {
+        return "a UDIF disk image; mount it read-only and probe what is inside".to_owned();
+    };
+    let mut hint = String::from("mount read-only and probe the .app inside");
+    if let Some(t) = trailer {
+        if t.is_split_segment() {
+            hint.push_str(&format!(
+                "; this is segment {} of {}, so all segments are needed",
+                t.segment_number, t.segment_count
+            ));
+        }
+        if t.decoded_size() > 0 {
+            hint.push_str(&format!(
+                "; {} MiB decoded",
+                t.decoded_size() / (1024 * 1024)
+            ));
+        }
+    }
+    if !compression.is_empty() {
+        let names: Vec<&str> = compression.iter().map(|c| c.label()).collect();
+        hint.push_str(&format!("; compression: {}", names.join(", ")));
+        if compression.iter().any(|c| !c.is_widely_supported()) {
+            hint.push_str(" (LZFSE needs Apple's decompressor; zlib/bzip2/LZMA do not)");
+        }
+    }
+    hint
+}
+
+/// A `.msi` is a database an installer program reads, not a program.
+fn decide_msi(
+    _report: &ProbeReport,
+    host: &HostFacts,
+    policy: &Policy,
+    source: &Path,
+) -> ExecutionPlan {
+    let refuse = |reason: RejectionReason, summary: String| ExecutionPlan {
+        strategy: Strategy::Rejected { reason },
+        confidence: Confidence::Refused,
+        summary,
+    };
+    if !policy.allow_cross_os {
+        return refuse(
+            RejectionReason::CrossOsDisabled,
+            format!(
+                "{}: a Windows installer but cross-OS execution is disabled",
+                source.display()
+            ),
+        );
+    }
+    if !host.wine_available {
+        return refuse(
+            RejectionReason::LayerMissing { layer: "wine" },
+            format!(
+                "{}: a Windows installer; wine is needed to run msiexec and is not installed",
+                source.display()
+            ),
+        );
+    }
+    ExecutionPlan {
+        strategy: Strategy::WineInstaller {
+            prefix: wine_prefix(),
+            package: source.to_path_buf(),
+        },
+        confidence: Confidence::Layer {
+            layer: "wine",
+            caveat: "Wine runs a subset of Windows installers; the package may fail partway",
+        },
+        summary: format!("{}: Windows installer via wine msiexec", source.display()),
+    }
+}
+
+/// A `.app` bundle: run the executable its plist names, through Darling.
+fn decide_app_bundle(
+    report: &ProbeReport,
+    host: &HostFacts,
+    policy: &Policy,
+    source: &Path,
+) -> ExecutionPlan {
+    let refuse = |reason: RejectionReason, summary: String| ExecutionPlan {
+        strategy: Strategy::Rejected { reason },
+        confidence: Confidence::Refused,
+        summary,
+    };
+    let FormatDetail::AppBundle {
+        executable,
+        minimum_system_version,
+        ..
+    } = &report.detail
+    else {
+        return refuse(
+            RejectionReason::UnknownFormat,
+            format!(
+                "{}: an .app bundle whose Info.plist named no executable",
+                source.display()
+            ),
+        );
+    };
+    let Some(executable) = executable else {
+        return refuse(
+            RejectionReason::UnknownFormat,
+            format!(
+                "{}: the bundle declares no CFBundleExecutable, so there is nothing to run",
+                source.display()
+            ),
+        );
+    };
+    if !policy.allow_cross_os {
+        return refuse(
+            RejectionReason::CrossOsDisabled,
+            format!(
+                "{}: a macOS bundle but cross-OS execution is disabled",
+                source.display()
+            ),
+        );
+    }
+    if !host.darling_available {
+        return refuse(
+            RejectionReason::LayerMissing { layer: "darling" },
+            format!(
+                "{}: a macOS bundle; darling is not installed",
+                source.display()
+            ),
+        );
+    }
+    // Darling is x86_64-only upstream (mldr has `#error TODO: aarch64`), so
+    // an arm64-only bundle has nowhere to run even with Darling present.
+    if report.arch != Arch::Unknown && report.arch != host.host_arch {
+        return refuse(
+            RejectionReason::ArchMismatchNoEmulator {
+                needed: report.arch,
+            },
+            format!(
+                "{}: a {} bundle, but darling only supports {} today",
+                source.display(),
+                report.arch,
+                host.host_arch
+            ),
+        );
+    }
+    let executable = PathBuf::from(executable);
+    // The caveat is deliberately the same string the plain Mach-O path
+    // uses: Darling's limits do not depend on how the binary was packaged,
+    // and a user who sees a .app should get the same warning as a user who
+    // sees a bare Mach-O.
+    let summary = match minimum_system_version {
+        Some(min) => format!(
+            "{}: macOS bundle via darling (declares minimum macOS {min}; compatibility unmeasured)",
+            source.display()
+        ),
+        None => format!("{}: macOS bundle via darling", source.display()),
+    };
+    ExecutionPlan {
+        strategy: Strategy::MacBundle {
+            prefix: darling_prefix(),
+            bundle: source.to_path_buf(),
+            executable,
+        },
+        confidence: Confidence::Layer {
+            layer: "darling",
+            caveat: "Darling runs x86_64 CLI and Foundation-class software; GUI/AppKit is partial",
+        },
+        summary,
     }
 }
 

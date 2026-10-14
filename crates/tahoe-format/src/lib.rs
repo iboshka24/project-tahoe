@@ -21,14 +21,19 @@
 //!
 //! - No semantic dispatch ("run this only if `e_type == ET_DYN`") — that is
 //!   the UEL's job, in userspace, with full parsing (ADR-0007).
-//! - `0xCAFEBABE` is **always** [`ObjectFormat::Ambiguous`]: it is both a
-//!   Java class file and a Mach-O fat header, and picking one would be a
-//!   guess with a wrong-dispatch failure mode.
+//! - `0xCAFEBABE` is disambiguated by `nfat_arch` plausibility plus a
+//!   validity check on each slice's Mach-O magic, the same rule `file(1)`
+//!   uses. When neither reading holds, the result is
+//!   [`ObjectFormat::Ambiguous`] rather than a guess.
+
+pub mod container;
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use tahoe_core::{Arch, Endianness, ObjectFormat, OsAbi};
+
+pub use container::{ContainerKind, DmgCompression, DmgTrailer};
 
 /// How many head bytes [`probe_file`] reads.
 pub const HEAD_LEN: usize = 512;
@@ -40,6 +45,23 @@ pub const KOLY_MAGIC: &[u8; 4] = b"koly";
 pub const APPIMAGE_MAGIC: &[u8; 3] = b"AI\x02";
 /// Offset of the AppImage magic.
 pub const APPIMAGE_OFFSET: usize = 8;
+
+/// One architecture slice inside a Mach-O universal ("fat") binary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FatSlice {
+    /// CPU the slice targets.
+    pub arch: Arch,
+    /// Raw `cputype`.
+    pub cputype: i32,
+    /// Raw `cpusubtype`.
+    pub cpusubtype: i32,
+    /// Byte offset of the slice within the file.
+    pub offset: u64,
+    /// Byte length of the slice.
+    pub size: u64,
+    /// Power-of-two alignment.
+    pub align: u32,
+}
 
 /// Structured detail for a [`ProbeReport`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,20 +96,58 @@ pub enum FormatDetail {
         /// True for the byte-swapped (`CIGAM`) magics.
         swapped: bool,
     },
-    /// Mach-O fat header: number of architectures, if reachable.
+    /// Mach-O fat header: the declared architectures.
     FatMachO {
-        /// Raw `nfat_arch`, big- or little-endian per the magic.
+        /// Raw `nfat_arch`.
         nfat_arch: Option<u32>,
+        /// One entry per slice, when the table was reachable.
+        slices: Vec<FatSlice>,
+        /// True when the file looks like a Java class file rather than a
+        /// universal binary.
+        looks_like_java: bool,
     },
     /// `#!` script: interpreter path as written (may be empty).
     Script {
         /// Interpreter path, lossy-decoded.
         interpreter: String,
     },
-    /// DMG heuristic result.
+    /// DMG result.
     Dmg {
         /// True only when the `koly` trailer was actually observed.
         confident: bool,
+        /// Parsed trailer, when the tail was reachable.
+        trailer: Option<Box<container::DmgTrailer>>,
+        /// Compression methods found in the embedded block table.
+        compression: Vec<container::DmgCompression>,
+    },
+    /// XAR archive: `(version, uncompressed_size)` from the header.
+    Xar {
+        /// Header version field.
+        version: u16,
+        /// Total uncompressed size of the archive's contents.
+        uncompressed_size: u64,
+    },
+    /// OLE2 compound file: the reliable way to tell an MSI from an
+    /// executable stub that shares the extension.
+    Ole2 {
+        /// Byte-order mark from the header (`0xFFFE` little-endian).
+        byte_order: u16,
+        /// Sector size, as a power of two.
+        sector_shift: u16,
+    },
+    /// Property list, with the detected encoding.
+    Plist {
+        /// `true` for `bplist00`, `false` for XML.
+        binary: bool,
+    },
+    /// macOS `.app` bundle, resolved to its executable.
+    AppBundle {
+        /// `CFBundleExecutable`, when the plist named one.
+        executable: Option<String>,
+        /// `CFBundleIdentifier`.
+        bundle_id: Option<String>,
+        /// `LSMinimumSystemVersion`.
+        minimum_system_version: Option<String>,
     },
     /// No further detail available.
     None,
@@ -213,36 +273,18 @@ pub fn probe_bytes(buf: &[u8]) -> ProbeReport {
             [0xfe, 0xed, 0xfa, 0xce] => return probe_macho(buf, Endianness::Big, false, true),
             // 64-bit Mach-O, big-endian file (MH_CIGAM_64).
             [0xfe, 0xed, 0xfa, 0xcf] => return probe_macho(buf, Endianness::Big, true, true),
-            // FAT_MAGIC and FAT_CIGAM collide with Java class files.
-            // We refuse to guess: report ambiguity (see module docs).
-            [0xca, 0xfe, 0xba, 0xbe] => {
-                let nfat_arch = read_u32(buf, 4, Endianness::Big);
-                return ProbeReport {
-                    format: ObjectFormat::Ambiguous {
-                        candidates: &["java-class", "fat-macho"],
-                    },
-                    arch: Arch::Unknown,
-                    bits: None,
-                    endian: None,
-                    os_abi: OsAbi::Unspecified,
-                    detail: FormatDetail::FatMachO { nfat_arch },
-                };
-            }
-            [0xbe, 0xba, 0xfe, 0xca] => {
-                let nfat_arch = read_u32(buf, 4, Endianness::Little);
-                return ProbeReport {
-                    format: ObjectFormat::Ambiguous {
-                        candidates: &["java-class", "fat-macho"],
-                    },
-                    arch: Arch::Unknown,
-                    bits: None,
-                    endian: None,
-                    os_abi: OsAbi::Unspecified,
-                    detail: FormatDetail::FatMachO { nfat_arch },
-                };
-            }
+            // FAT_MAGIC / FAT_CIGAM collide with Java class files. `file(1)`
+            // resolves this by range: a Java class stores its major version
+            // where the fat header stores `nfat_arch`, and the first released
+            // class format was version 43, while no universal binary has ever
+            // declared 20 or more architectures. That gives a usable gap.
+            [0xca, 0xfe, 0xba, 0xbe] => return probe_fat(buf, Endianness::Big),
+            [0xbe, 0xba, 0xfe, 0xca] => return probe_fat(buf, Endianness::Little),
             _ => {}
         }
+    }
+    if let Some(kind) = container::identify_container(buf) {
+        return probe_container(buf, kind);
     }
     if buf.len() >= 2 && buf[0] == b'#' && buf[1] == b'!' {
         let end = buf.iter().position(|&b| b == b'\n').unwrap_or(buf.len());
@@ -257,6 +299,142 @@ pub fn probe_bytes(buf: &[u8]) -> ProbeReport {
         };
     }
     ProbeReport::unknown()
+}
+
+/// Highest `nfat_arch` that can plausibly be a universal binary.
+///
+/// Chosen from `file(1)`'s rule (`magic/Magdir/cafebabe`): the first
+/// released Java class format was version 43, and no Mach-O universal
+/// binary has ever carried anything close to 20 slices.
+const MAX_PLAUSIBLE_FAT_ARCHES: u32 = 20;
+
+/// Disambiguate `0xCAFEBABE` between a Java class file and a Mach-O fat
+/// header, and parse the architecture table when it is the latter.
+fn probe_fat(buf: &[u8], endian: Endianness) -> ProbeReport {
+    let nfat_arch = read_u32(buf, 4, endian);
+    let slices = parse_fat_slices(buf, endian, nfat_arch);
+    let looks_like_java = match nfat_arch {
+        Some(n) => n >= MAX_PLAUSIBLE_FAT_ARCHES,
+        None => false,
+    };
+    // A plausible count *plus* at least one slice that actually starts with
+    // a Mach-O magic is what makes this decisive rather than a guess.
+    let has_valid_slice = !slices.is_empty()
+        && slices.iter().all(|s| {
+            let start = usize::try_from(s.offset).ok();
+            start.is_some_and(|o| {
+                buf.get(o..o + 4).is_some_and(|m| {
+                    matches!(m, [0xcf, 0xfa, 0xed, 0xfe] | [0xce, 0xfa, 0xed, 0xfe])
+                })
+            })
+        });
+
+    let format = if looks_like_java {
+        ObjectFormat::JavaClass
+    } else if nfat_arch.is_some() && !has_valid_slice {
+        // Plausible count but the table is not a readable Mach-O table.
+        // Refusing is the honest answer: a wrong guess hands a Java class
+        // to a Mach-O loader.
+        ObjectFormat::Ambiguous {
+            candidates: &["java-class", "fat-macho"],
+        }
+    } else {
+        ObjectFormat::FatMachO
+    };
+    let arch = slices.first().map_or(Arch::Unknown, |s| s.arch);
+    ProbeReport {
+        format,
+        arch,
+        bits: slices
+            .first()
+            .and_then(|s| Arch::from_macho_cputype(s.cputype.unsigned_abs()).is_64bit())
+            .map(|is64| if is64 { 64 } else { 32 }),
+        endian: Some(endian),
+        os_abi: OsAbi::MacOs,
+        detail: FormatDetail::FatMachO {
+            nfat_arch,
+            slices,
+            looks_like_java,
+        },
+    }
+}
+
+/// Parse the `fat_arch[]` table that follows a `fat_header`.
+fn parse_fat_slices(buf: &[u8], endian: Endianness, nfat_arch: Option<u32>) -> Vec<FatSlice> {
+    const FAT_ARCH_SIZE: usize = 20;
+    let mut out = Vec::new();
+    let Some(count) = nfat_arch else { return out };
+    if count == 0 || count > MAX_PLAUSIBLE_FAT_ARCHES {
+        return out;
+    }
+    for i in 0..count as usize {
+        let base = 8 + i * FAT_ARCH_SIZE;
+        let Some(raw_cputype) = read_u32(buf, base, endian) else {
+            return Vec::new();
+        };
+        let Some(cpusubtype) = read_u32(buf, base + 4, endian) else {
+            return Vec::new();
+        };
+        let Some(offset) = read_u32(buf, base + 8, endian) else {
+            return Vec::new();
+        };
+        let Some(size) = read_u32(buf, base + 12, endian) else {
+            return Vec::new();
+        };
+        let Some(align) = read_u32(buf, base + 16, endian) else {
+            return Vec::new();
+        };
+        out.push(FatSlice {
+            arch: Arch::from_macho_cputype(raw_cputype),
+            cputype: raw_cputype as i32,
+            cpusubtype: cpusubtype as i32,
+            offset: u64::from(offset),
+            size: u64::from(size),
+            align,
+        });
+    }
+    out
+}
+
+/// Build a report for a container format.
+fn probe_container(buf: &[u8], kind: container::ContainerKind) -> ProbeReport {
+    let detail = match kind {
+        container::ContainerKind::Xar => {
+            // Header layout: "xar!" then u16 size (big-endian), u16 version,
+            // then u64 uncompressed size — both big-endian.
+            let header_size = read_u16(buf, 4, Endianness::Big).unwrap_or(0);
+            FormatDetail::Xar {
+                version: read_u16(buf, 6, Endianness::Big).unwrap_or(0),
+                uncompressed_size: u64::from(
+                    read_u32(
+                        buf,
+                        8 + u32::from(header_size).min(1024) as usize,
+                        Endianness::Big,
+                    )
+                    .unwrap_or(0),
+                ),
+            }
+        }
+        container::ContainerKind::Ole2 => FormatDetail::Ole2 {
+            byte_order: read_u16(buf, 0x1C, Endianness::Little).unwrap_or(0),
+            sector_shift: read_u16(buf, 0x1E, Endianness::Little).unwrap_or(0),
+        },
+        container::ContainerKind::BinaryPlist => FormatDetail::Plist { binary: true },
+        container::ContainerKind::XmlPlist => FormatDetail::Plist { binary: false },
+        container::ContainerKind::Dmg => FormatDetail::Dmg {
+            confident: false,
+            trailer: None,
+            compression: Vec::new(),
+        },
+    };
+    ProbeReport {
+        format: kind.object_format(),
+        arch: Arch::Unknown,
+        bits: None,
+        endian: None,
+        os_abi: OsAbi::Unspecified,
+        detail,
+    }
 }
 
 fn probe_elf(buf: &[u8]) -> ProbeReport {
@@ -405,17 +583,34 @@ pub fn probe_file(path: &Path) -> std::io::Result<ProbeReport> {
     let mut tail = vec![0u8; KOLY_LEN.min(len as usize)];
     file.seek(SeekFrom::End(-(tail.len() as i64)))?;
     file.read_exact(&mut tail)?;
-    if tail.starts_with(KOLY_MAGIC) {
-        return Ok(ProbeReport {
-            format: ObjectFormat::Dmg,
-            arch: Arch::Unknown,
-            bits: None,
-            endian: None,
-            os_abi: OsAbi::MacOs,
-            detail: FormatDetail::Dmg { confident: true },
-        });
+    let Some(trailer) = container::parse_dmg_trailer(&tail) else {
+        return Ok(report);
+    };
+
+    // Follow the trailer's XML pointer to read the real compression table.
+    let mut compression = Vec::new();
+    if trailer.has_block_table() && trailer.xml_length > 0 {
+        let want = trailer.xml_length.min(4 * 1024 * 1024) as usize;
+        let mut xml = vec![0u8; want];
+        if file.seek(SeekFrom::Start(trailer.xml_offset)).is_ok()
+            && file.read_exact(&mut xml).is_ok()
+        {
+            compression = container::scan_dmg_compression(&xml);
+        }
     }
-    Ok(report)
+
+    Ok(ProbeReport {
+        format: ObjectFormat::Dmg,
+        arch: Arch::Unknown,
+        bits: None,
+        endian: None,
+        os_abi: OsAbi::MacOs,
+        detail: FormatDetail::Dmg {
+            confident: true,
+            trailer: Some(Box::new(trailer)),
+            compression,
+        },
+    })
 }
 
 /// Unit tests live in `tests.rs` so the parser above stays readable.

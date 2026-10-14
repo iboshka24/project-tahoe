@@ -1581,6 +1581,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tahoe-compat"
+version = "0.1.0"
+dependencies = [
+ "tahoe-core",
+ "tahoe-format",
+]
+
+[[package]]
 name = "tahoe-compositor"
 version = "0.1.0"
 dependencies = [
@@ -1616,6 +1624,7 @@ name = "tahoe-uel"
 version = "0.1.0"
 dependencies = [
  "rustix 0.38.44",
+ "tahoe-compat",
  "tahoe-core",
  "tahoe-format",
 ]
