@@ -186,6 +186,10 @@
 root и не меняет систему.
 
 ```sh
+# Одна команда: сборка, тесты, clippy, fmt, свежесть сгенерированного Swift,
+# рендер рабочего стола, ядерная диспетчеризация, Apple-проект, бенчмарк.
+tests/check-all.sh
+
 cargo test                       # 511 тестов
 cargo clippy --all-targets -- -D warnings
 cargo fmt --all -- --check
