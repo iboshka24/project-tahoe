@@ -6,6 +6,10 @@
 // running state as a dot. The geometry comes from the generated metrics, so
 // the SwiftUI dock and a `tahoe-preview` render are the same size.
 
+// SwiftUI exists on Apple platforms and not on Linux. Guarding the whole
+// file keeps the package buildable here, so `swift test` can still run the
+// design-token and model tests. On iOS and macOS this compiles normally.
+#if canImport(SwiftUI)
 import SwiftUI
 import TahoeDesign
 
@@ -58,3 +62,4 @@ struct DockView: View {
         )
     }
 }
+#endif

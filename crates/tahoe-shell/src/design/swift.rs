@@ -122,7 +122,7 @@ public struct GradientStop: Equatable, Sendable {
 ///
 /// `namespace` is the Swift enum name, which differs per appearance so both
 /// can live in one file.
-fn emit_tokens(system: &DesignSystem, namespace: &str, wallpaper_fn: &str) -> String {
+fn emit_tokens(system: &DesignSystem, namespace: &str) -> String {
     let mut out = String::new();
     let _ = writeln!(out, "/// Design tokens for the {} appearance.", system.name);
     let _ = writeln!(out, "public enum {namespace} {{");
@@ -225,7 +225,7 @@ fn emit_tokens(system: &DesignSystem, namespace: &str, wallpaper_fn: &str) -> St
     ///
     /// Mirrors `DesignSystem::wallpaper_at`. The Rust implementation is the
     /// reference; `swift_emitter` tests assert this matches it.
-    public static func {wallpaper_fn}(at t: Double) -> RGBA {{
+    public static func wallpaperColor(at t: Double) -> RGBA {{
         let clamped = min(max(t, 0), 1)
         guard let first = wallpaper.first else {{
             return RGBA(red: 0, green: 0, blue: 0, alpha: 1)
@@ -293,7 +293,7 @@ impl DesignSystem {
         let header = self.swift_header(false);
         format!(
             "{header}\n{VALUE_TYPES}\n{}\n{}",
-            emit_tokens(self, "TahoeDesign", "wallpaperColor"),
+            emit_tokens(self, "TahoeDesign"),
             emit_swiftui_extensions_single()
         )
     }
@@ -313,13 +313,12 @@ impl DesignSystem {
         out.push('\n');
         out.push_str(VALUE_TYPES);
         out.push('\n');
-        out.push_str(&emit_tokens(dark, "TahoeDesign_Dark", "darkWallpaperColor"));
+        // The same member name in both namespaces: they are distinct types,
+        // so there is nothing to disambiguate, and a caller writing
+        // `TahoeDesign_Dark.wallpaperColor(at:)` gets what they expect.
+        out.push_str(&emit_tokens(dark, "TahoeDesign_Dark"));
         out.push('\n');
-        out.push_str(&emit_tokens(
-            light,
-            "TahoeDesign_Light",
-            "lightWallpaperColor",
-        ));
+        out.push_str(&emit_tokens(light, "TahoeDesign_Light"));
         let _ = writeln!(
             out,
             r#"
@@ -345,8 +344,8 @@ public enum Tahoe {{
     /// The wallpaper sampled at `t` for an appearance.
     public static func wallpaper(at t: Double, appearance: TahoeAppearance) -> RGBA {{
         switch appearance {{
-        case .dark: return TahoeDesign_Dark.darkWallpaperColor(at: t)
-        case .light: return TahoeDesign_Light.lightWallpaperColor(at: t)
+        case .dark: return TahoeDesign_Dark.wallpaperColor(at: t)
+        case .light: return TahoeDesign_Light.wallpaperColor(at: t)
         }}
     }}
 

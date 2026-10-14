@@ -45,5 +45,13 @@ let package = Package(
             name: "TahoeDesignTests",
             dependencies: ["TahoeDesign"]
         ),
+
+        // Model assertions. `GalleryModel` has no SwiftUI dependency, so this
+        // also runs headlessly, and its search contract is the same one the
+        // Rust `LauncherIndex` implements.
+        .testTarget(
+            name: "TahoeGalleryTests",
+            dependencies: ["TahoeGallery"]
+        ),
     ]
 )

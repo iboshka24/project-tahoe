@@ -69,9 +69,13 @@ final class TokenTests: XCTestCase {
 
     func testWallpaperIsARealMonotonicGradient() {
         for isDark in [true, false] {
+            // Explicit closures rather than unapplied method references:
+            // a bare `Type.method(at:)` inside a ternary defeats the type
+            // checker ("failed to produce diagnostic"), which is a Swift
+            // limitation and not a problem with the code being tested.
             let sample: (Double) -> RGBA = isDark
-                ? TahoeDesign_Dark.wallpaperColor(at:)
-                : TahoeDesign_Light.wallpaperColor(at:)
+                ? { t in TahoeDesign_Dark.wallpaperColor(at: t) }
+                : { t in TahoeDesign_Light.wallpaperColor(at: t) }
             let top = sample(0)
             let bottom = sample(1)
             XCTAssertNotEqual(top, bottom, "the wallpaper must not be a flat colour")

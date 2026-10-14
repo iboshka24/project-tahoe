@@ -65,7 +65,7 @@ tool that does this; nothing else builds SwiftUI for iOS on Linux.
 
 | Requirement | Notes |
 |---|---|
-| Swift **6.4** toolchain | from <https://swift.org/install/linux>. A tarball, no root needed. |
+| Swift **6.4** toolchain | `tests/swift-env.sh` installs one without root — see below |
 | **`Xcode.xip`** | ~7 GB, from <https://developer.apple.com/download/all/?q=Xcode>, **signed in with your Apple ID** |
 | xtool | an AppImage, no root needed |
 
@@ -76,6 +76,38 @@ the extracted SDK may be redistributed is not addressed anywhere in xtool's
 documentation, so **do not assume it may be**. Tahoe never downloads an SDK
 and never copies one — `tahoe-compat` only inspects a prefix you already
 installed.
+
+### Installing Swift on Arch without root
+
+Arch ships no Swift, and swift.org publishes no Arch build. `tests/swift-env.sh`
+fetches the Ubuntu 26.04 tarball into `~/.local/share/swift-toolchain` and
+fixes the one interoperability problem:
+
+```sh
+tests/swift-env.sh
+export PATH="$HOME/.local/share/swift-toolchain/usr/bin:$PATH"
+tests/swift-env.sh --verify
+```
+
+**The problem, because it is worth knowing about.** The Ubuntu build links
+`libncurses.so.6`. Arch builds ncurses wide-only and ships `libncursesw.so.6`,
+so `swiftc` fails with
+
+```
+swift: error while loading shared libraries: libncurses.so.6
+```
+
+The naive fix is `LD_LIBRARY_PATH` pointing at a symlink. It works —
+`swift --version` succeeds — and then **fails at link time**, because SwiftPM
+spawns `swiftc` for linking without propagating the caller's environment.
+That is a confusing way to lose an afternoon.
+
+The script instead puts the symlink inside the toolchain's own
+`lib/swift/linux`, which is already on `swiftc`'s `RUNPATH`
+(`$ORIGIN/../lib/swift/linux`). No environment variable is needed anywhere.
+
+Verified on this machine: Swift 6.4.1 (Ubuntu 26.04 build) runs on CachyOS
+with glibc 2.44 and links a test bundle successfully.
 
 ### The build
 
@@ -160,15 +192,31 @@ directly.
   the iOS layout, `MinimumOSVersion`, an arm64 Mach-O, `PLATFORM_IOS`, an
   unsigned binary, and the three framework dependencies.
 
-**Not verified:**
-- **no build has been attempted.** Swift 6.4 and the iOS SDK are not
-  installed, and the SDK needs an Apple ID.
-- **no Swift file has been compiled.** A typo in a view body would not have
-  been caught. The token target is the only part with a compile-time
-  guarantee, and that guarantee is structural, not tested.
+**Verified after installing Swift 6.4.1:**
+- **the generated `TahoeDesign.swift` compiles** (`swift build --target
+  TahoeDesign`). This is the check the whole code-generation arrangement
+  depends on.
+- **all 11 Swift files parse** (`swiftc -parse`, which needs no SwiftUI and
+  no SDK, so it covers the view files too).
+- **`swift test` runs 21 tests and they pass** — 13 token assertions and 8
+  model assertions. The model target is deliberately SwiftUI-free, so the
+  launcher's search contract is checked against the same rules the Rust
+  `LauncherIndex` implements. That is a cross-language behavioural check
+  rather than two independent guesses.
+
+**Found by compiling, which is the point:** the emitted sampler was named
+`darkWallpaperColor`, and the hand-written Swift test called
+`wallpaperColor`. Nothing but a compiler could have caught that. The emitter
+was simplified to use the same member name in both namespaces, since they are
+distinct types and there was nothing to disambiguate.
+
+**Still not verified:**
+- **no iOS build has been attempted.** The SDK needs an Apple ID.
+- **the `TahoeGallery` views have not been compiled**, only parsed. They
+  `#if canImport(SwiftUI)` to nothing on Linux; a typo that is syntactically
+  valid but semantically wrong would still get through.
 - **the generated `Info.plist` has not been compared to a real one.** The
   fixture is modelled on xtool's `Packer.swift`, not captured from a run.
-- **the Swift test target has never been run.**
 
 ## 7. Why this belongs in Tahoe
 

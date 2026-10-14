@@ -96,7 +96,7 @@ public enum TahoeDesign_Dark {
     ///
     /// Mirrors `DesignSystem::wallpaper_at`. The Rust implementation is the
     /// reference; `swift_emitter` tests assert this matches it.
-    public static func darkWallpaperColor(at t: Double) -> RGBA {
+    public static func wallpaperColor(at t: Double) -> RGBA {
         let clamped = min(max(t, 0), 1)
         guard let first = wallpaper.first else {
             return RGBA(red: 0, green: 0, blue: 0, alpha: 1)
@@ -174,7 +174,7 @@ public enum TahoeDesign_Light {
     ///
     /// Mirrors `DesignSystem::wallpaper_at`. The Rust implementation is the
     /// reference; `swift_emitter` tests assert this matches it.
-    public static func lightWallpaperColor(at t: Double) -> RGBA {
+    public static func wallpaperColor(at t: Double) -> RGBA {
         let clamped = min(max(t, 0), 1)
         guard let first = wallpaper.first else {
             return RGBA(red: 0, green: 0, blue: 0, alpha: 1)
@@ -221,8 +221,8 @@ public enum Tahoe {
     /// The wallpaper sampled at `t` for an appearance.
     public static func wallpaper(at t: Double, appearance: TahoeAppearance) -> RGBA {
         switch appearance {
-        case .dark: return TahoeDesign_Dark.darkWallpaperColor(at: t)
-        case .light: return TahoeDesign_Light.lightWallpaperColor(at: t)
+        case .dark: return TahoeDesign_Dark.wallpaperColor(at: t)
+        case .light: return TahoeDesign_Light.wallpaperColor(at: t)
         }
     }
 

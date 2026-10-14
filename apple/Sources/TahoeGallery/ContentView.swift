@@ -6,6 +6,10 @@
 // wallpaper, then chrome, then windows — so a screenshot here and a
 // `tahoe-preview` render can be compared directly.
 
+// SwiftUI exists on Apple platforms and not on Linux. Guarding the whole
+// file keeps the package buildable here, so `swift test` can still run the
+// design-token and model tests. On iOS and macOS this compiles normally.
+#if canImport(SwiftUI)
 import SwiftUI
 import TahoeDesign
 
@@ -104,3 +108,4 @@ struct ContentView: View {
         }
     }
 }
+#endif

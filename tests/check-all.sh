@@ -124,10 +124,79 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "Swift: compile, parse, test"
+# ---------------------------------------------------------------------------
+#
+# The Swift toolchain is not a system package on Arch. `tests/swift-env.sh`
+# explains how to install one without root; here we just look for one.
+
+SWIFT_ROOT="${TAHOE_SWIFT_ROOT:-$HOME/.local/share/swift-toolchain}"
+if command -v swift >/dev/null 2>&1; then
+    SWIFT_BIN="$(command -v swift)"
+elif [[ -x "$SWIFT_ROOT/usr/bin/swift" ]]; then
+    SWIFT_BIN="$SWIFT_ROOT/usr/bin/swift"
+    export PATH="$SWIFT_ROOT/usr/bin:$PATH"
+else
+    SWIFT_BIN=""
+fi
+
+if [[ -z "$SWIFT_BIN" ]]; then
+    skip "Swift: no toolchain (see tests/swift-env.sh to install one without root)"
+else
+    ok "Swift toolchain: $("$SWIFT_BIN" --version 2>&1 | head -1)"
+
+    # 1. The generated tokens must actually compile. This is the check the
+    #    whole code-generation arrangement depends on.
+    if (cd apple && swift build --target TahoeDesign) >/tmp/tahoe-swift-build.log 2>&1; then
+        ok "generated TahoeDesign.swift compiles"
+    else
+        bad "generated TahoeDesign.swift does not compile"
+        sed 's/^/        /' /tmp/tahoe-swift-build.log | tail -20
+    fi
+
+    # 2. Every Swift file must at least parse. `-parse` needs no SwiftUI and
+    #    no SDK, so it covers the view files that cannot be compiled here.
+    parsed=0
+    syntax_fail=0
+    while IFS= read -r f; do
+        parsed=$((parsed + 1))
+        if ! swiftc -parse "$f" >/tmp/tahoe-swift-parse.log 2>&1; then
+            syntax_fail=$((syntax_fail + 1))
+            echo "        syntax error in $f"
+            grep -E 'error:' /tmp/tahoe-swift-parse.log | head -3 | sed 's/^/          /'
+        fi
+    done < <(find apple/Sources apple/Tests -name '*.swift' | sort)
+    if [[ "$syntax_fail" -eq 0 ]]; then
+        ok "all $parsed Swift files parse"
+    else
+        bad "$syntax_fail of $parsed Swift files have syntax errors"
+    fi
+
+    # 3. The token and model tests must pass.
+    if (cd apple && swift test) >/tmp/tahoe-swift-test.log 2>&1; then
+        # Each bundle reports its count three times (its own suite, the
+        # xctest wrapper, and "All tests"), so the distinct values have to be
+        # summed rather than the lines. Averaging them was a bug in the first
+        # version of this check and reported 10.5 tests.
+        SWIFT_TESTS=$(grep -oE 'Executed [0-9]+ tests' /tmp/tahoe-swift-test.log |
+            grep -oE '^Executed [0-9]+' | grep -oE '[0-9]+' | sort -un |
+            awk '{s += $1} END {print s + 0}')
+        if [[ "${SWIFT_TESTS:-0}" -ge 15 ]]; then
+            ok "swift test: ${SWIFT_TESTS} tests passed"
+        else
+            bad "only ${SWIFT_TESTS:-0} Swift tests ran; expected at least 15"
+        fi
+    else
+        bad "swift test failed"
+        grep -E 'error:|failed' /tmp/tahoe-swift-test.log | head -10 | sed 's/^/        /'
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 section "Apple toolchain"
 # ---------------------------------------------------------------------------
 
-APPLE_LOG=$(cargo run --quiet -p tahoe-compat --bin tahoe-compat -- apple toolchain 2>&1 || true)
+APPLE_LOG=$(PATH="$PATH" cargo run --quiet -p tahoe-compat --bin tahoe-compat -- apple toolchain 2>&1 || true)
 if grep -q 'ready to build' <<<"$APPLE_LOG"; then
     ok "swift + xtool + darwin SDK present; a build could run"
 elif grep -q 'Swift toolchain on PATH' <<<"$APPLE_LOG"; then
