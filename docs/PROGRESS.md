@@ -118,6 +118,30 @@
   внутри user namespace, ядро реально диспетчеризует файл нашему
   интерпретатору, и хост не меняется. Есть сквозной тест.
 
+### Apple-приложения на Linux (сессия 3)
+
+- **`docs/apple-development.md`** + `apple/` — реальное SwiftUI-приложение
+  (`TahoeGallery`), собираемое под iOS на Linux через
+  [xtool](https://github.com/xtool-org/xtool) (MIT, ~10k звёзд, активен).
+- **Единая дизайн-система**: Rust — источник истины, Swift **генерируется**
+  (`tahoe-design-export`). Три независимые проверки: регенерация с
+  сравнением байт, обратный разбор сгенерированного Swift с сравнением
+  значений, и `swift test` на стороне Swift. Расхождение палитры стало
+  структурно невозможным.
+- **`tahoe-compat::xtool`**: определение предусловий в правильном порядке
+  (сначала Swift, потом SDK — иначе пользователя отправят качать 7 ГБ),
+  разбор `xtool.yml`, построение команды сборки, инспекция результата.
+  CLI: `apple toolchain|project|build|inspect`.
+- **Три настоящих бага, найденных реалистичной фикстурой iOS-бандла:**
+  1. iOS-бандлы **плоские** (`Foo.app/Info.plist`), без `Contents/` —
+     парсер знал только macOS-раскладку и отверг бы всё, что собирает xtool;
+  2. iOS пишет `MinimumOSVersion`, macOS — `LSMinimumSystemVersion`,
+     читался только второй;
+  3. самозакрывающийся `<dict/>` не парсился, а он есть в каждом
+     `UILaunchScreen`.
+  Плюс четвёртый: `peek_tag` останавливался на `/`, из-за чего `</array>`
+  выглядел как пустой открывающий тег.
+
 ## In Progress
 
 Этап 3 — GUI оболочки: панель в layer-shell, Dock, Launcher.
@@ -162,7 +186,7 @@
 root и не меняет систему.
 
 ```sh
-cargo test                       # 457 тестов
+cargo test                       # 511 тестов
 cargo clippy --all-targets -- -D warnings
 cargo fmt --all -- --check
 cargo build -p tahoe-compositor  # winit

@@ -755,18 +755,64 @@ impl std::fmt::Display for BundleError {
 
 impl std::error::Error for BundleError {}
 
-/// A resolved macOS application bundle.
+/// Which of the two bundle layouts this is.
+///
+/// They are genuinely different, and assuming macOS for both was a real bug
+/// that only a realistic iOS fixture exposed:
+///
+/// | | macOS | iOS |
+/// |---|---|---|
+/// | plist | `Foo.app/Contents/Info.plist` | `Foo.app/Info.plist` |
+/// | binary | `Foo.app/Contents/MacOS/Foo` | `Foo.app/Foo` |
+///
+/// xtool produces the iOS layout, so a reader that only knew `Contents/`
+/// would reject every app it built.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BundleLayout {
+    /// `Contents/Info.plist` and `Contents/MacOS/<executable>`.
+    MacOs,
+    /// `Info.plist` and `<executable>` at the bundle root.
+    Ios,
+}
+
+impl BundleLayout {
+    /// The plist path inside a bundle of this layout.
+    #[must_use]
+    pub fn plist_path(self, root: &Path) -> PathBuf {
+        match self {
+            Self::MacOs => root.join("Contents/Info.plist"),
+            Self::Ios => root.join("Info.plist"),
+        }
+    }
+
+    /// The executable path for a given `CFBundleExecutable`.
+    #[must_use]
+    pub fn executable_path(self, root: &Path, name: &str) -> PathBuf {
+        match self {
+            Self::MacOs => root.join("Contents/MacOS").join(name),
+            Self::Ios => root.join(name),
+        }
+    }
+}
+
+/// A resolved macOS or iOS application bundle.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppBundle {
     /// The `.app` directory.
     pub root: PathBuf,
+    /// Which layout resolved, so a caller can print the right paths.
+    pub layout: BundleLayout,
     /// `Contents/MacOS/<CFBundleExecutable>`.
     pub executable: PathBuf,
     /// `CFBundleExecutable`.
     pub executable_name: String,
     /// `CFBundleIdentifier`, used for window/dock identity.
     pub identifier: Option<String>,
-    /// `LSMinimumSystemVersion`.
+    /// The declared minimum OS version.
+    ///
+    /// macOS uses `LSMinimumSystemVersion`; iOS uses `MinimumOSVersion`.
+    /// Reading only the first was a real bug that a realistic iOS fixture
+    /// exposed — every xtool-built app reported no minimum at all.
     pub minimum_system_version: Option<String>,
     /// `CFBundleIconFile`.
     pub icon_file: Option<String>,
@@ -779,12 +825,28 @@ pub struct AppBundle {
 }
 
 impl AppBundle {
+    /// The layout a directory uses, or `None` when it is not a bundle.
+    ///
+    /// macOS is checked first only because a `Contents/` directory is the
+    /// more specific signal; an iOS bundle has nothing to confuse it with.
+    #[must_use]
+    pub fn layout_of(path: &Path) -> Option<BundleLayout> {
+        if !path.is_dir() || path.extension().is_none_or(|e| e != "app") {
+            return None;
+        }
+        if BundleLayout::MacOs.plist_path(path).is_file() {
+            return Some(BundleLayout::MacOs);
+        }
+        if BundleLayout::Ios.plist_path(path).is_file() {
+            return Some(BundleLayout::Ios);
+        }
+        None
+    }
+
     /// True when the bundle's directory name looks like an application.
     #[must_use]
     pub fn looks_like_bundle(path: &Path) -> bool {
-        path.is_dir()
-            && path.extension().is_some_and(|e| e == "app")
-            && path.join("Contents/Info.plist").is_file()
+        Self::layout_of(path).is_some()
     }
 
     /// Resolve a bundle directory into a runnable description.
@@ -795,17 +857,17 @@ impl AppBundle {
     /// rather than guessed at: picking the largest file in `Contents/MacOS`
     /// would work most of the time and would be wrong the rest.
     pub fn resolve(path: &Path) -> Result<Self, BundleError> {
-        if !Self::looks_like_bundle(path) {
+        let Some(layout) = Self::layout_of(path) else {
             return Err(BundleError::NotABundle(path.to_path_buf()));
-        }
-        let plist_path = path.join("Contents/Info.plist");
+        };
+        let plist_path = layout.plist_path(path);
         let raw = fs::read(&plist_path).map_err(|e| BundleError::BadPlist(e.to_string()))?;
         let plist = Plist::parse(&raw).map_err(|e| BundleError::BadPlist(e.to_string()))?;
 
         let executable_name = plist
             .get_string("CFBundleExecutable")
             .ok_or_else(|| BundleError::NoExecutableKey(path.to_path_buf()))?;
-        let executable = path.join("Contents/MacOS").join(&executable_name);
+        let executable = layout.executable_path(path, &executable_name);
         if !executable.exists() {
             return Err(BundleError::ExecutableMissing(executable));
         }
@@ -825,10 +887,13 @@ impl AppBundle {
 
         Ok(Self {
             root: path.to_path_buf(),
+            layout,
             executable,
             executable_name,
             identifier: plist.get_string("CFBundleIdentifier"),
-            minimum_system_version: plist.get_string("LSMinimumSystemVersion"),
+            minimum_system_version: plist
+                .get_string("LSMinimumSystemVersion")
+                .or_else(|| plist.get_string("MinimumOSVersion")),
             icon_file: plist.get_string("CFBundleIconFile"),
             is_agent: plist.get_bool("LSUIElement").unwrap_or(false),
             package_type: plist.get_string("CFBundlePackageType"),
@@ -1253,6 +1318,20 @@ impl XmlCursor<'_> {
             return Err(PlistError::Malformed("nesting too deep".into()));
         }
         self.skip_whitespace_and_declarations();
+        // Self-closing empty containers. `<dict/>` in particular is
+        // everywhere in real plists — every `UILaunchScreen` is one — and a
+        // reader that only looks for `<dict>` rejects the whole file.
+        for (tag, value) in [
+            ("<dict/>", Plist::Dict(Vec::new())),
+            ("<array/>", Plist::Array(Vec::new())),
+            ("<string/>", Plist::String(String::new())),
+            ("<data/>", Plist::Data(Vec::new())),
+        ] {
+            if self.text[self.pos..].starts_with(tag) {
+                self.pos += tag.len();
+                return Ok(value);
+            }
+        }
         if self.open_tag("dict") {
             let mut entries = Vec::new();
             loop {
@@ -1324,6 +1403,65 @@ pub fn unescape_xml(text: &str) -> String {
         .replace("&quot;", "\"")
         .replace("&apos;", "'")
         .replace("&amp;", "&")
+}
+
+/// Parse `major.minor` out of a `swift --version` banner.
+///
+/// Requires a digits-dot-digits run with at most three digits on each side,
+/// which is what makes it reject a build id like `20240101` while accepting
+/// `Swift version 6.4 (swift-6.4-RELEASE)` and `Apple Swift version 5.9.2`.
+///
+/// Lives in this module because it is the same shape of problem as the
+/// kernel release parser below and both are used by diagnostics.
+#[must_use]
+pub fn parse_swift_release(output: &str) -> Option<(u64, u64)> {
+    // A swift-driver banner reads
+    // "swift-driver version: 1.100.1 Swift version 6.0.3", where the first
+    // `N.N` is the driver's, not the compiler's. Prefer what follows the
+    // phrase, and fall back to a scan only when the phrase is absent.
+    if let Some(at) = output.find("Swift version")
+        && let Some(v) = scan_dotted_version(&output[at..])
+    {
+        return Some(v);
+    }
+    scan_dotted_version(output)
+}
+
+/// Find the first `digits.digits` run, with at most three digits each side.
+fn scan_dotted_version(output: &str) -> Option<(u64, u64)> {
+    let bytes = output.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if !bytes[i].is_ascii_digit() {
+            i += 1;
+            continue;
+        }
+        let major_start = i;
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        let major_end = i;
+        if i >= bytes.len() || bytes[i] != b'.' {
+            continue;
+        }
+        i += 1;
+        let minor_start = i;
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        if i == minor_start {
+            continue;
+        }
+        let major_len = major_end - major_start;
+        let minor_len = i - minor_start;
+        if major_len == 0 || major_len > 3 || minor_len > 3 {
+            continue;
+        }
+        let major = output[major_start..major_end].parse().ok()?;
+        let minor = output[minor_start..i].parse().ok()?;
+        return Some((major, minor));
+    }
+    None
 }
 
 /// Parse `major.minor.patch` out of a kernel release string.

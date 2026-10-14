@@ -12,6 +12,10 @@
 //!   reading, DMG packaging. Inspection only; Darling does the running.
 //! - [`binfmt`] — rootless, namespaced `binfmt_misc` dispatch. The kernel
 //!   mechanism, and an honest account of what it cannot express.
+//! - [`xtool`] — building Apple applications on Linux with xtool, and
+//!   feeding the resulting `.app` back through [`macos`] for inspection.
+//!   This is what turns the macOS parsers from fixture-tested into
+//!   artifact-tested, on a machine with no Mac.
 //!
 //! Nothing in this crate decides *whether* to run something. That is
 //! `tahoe-uel`'s job, and it does it with a confidence report (ADR-0006).
@@ -19,6 +23,7 @@
 pub mod binfmt;
 pub mod macos;
 pub mod wine;
+pub mod xtool;
 
 /// A discovered application, from any source.
 ///

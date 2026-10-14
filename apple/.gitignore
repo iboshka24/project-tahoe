@@ -1,0 +1,4 @@
+xtool/
+.swiftpm/
+.build/
+DerivedData/

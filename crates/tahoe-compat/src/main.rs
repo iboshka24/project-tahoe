@@ -22,6 +22,9 @@ use tahoe_compat::{
     binfmt::{self, Dispatcher},
     macos::{AppBundle, MachOFile},
     wine::{NTSYNC_DEVICE, Prefix, WineRuntime},
+    xtool::{
+        AppleBuildError, AppleProject, AppleToolchain, BuildRequest, Configuration, inspect_bundle,
+    },
 };
 
 const USAGE: &str = "\
@@ -36,6 +39,10 @@ USAGE:
     tahoe-compat binfmt rules [--interpreter-dir <dir>]
     tahoe-compat binfmt status
     tahoe-compat binfmt self-test
+    tahoe-compat apple toolchain
+    tahoe-compat apple project <dir>
+    tahoe-compat apple build <dir> [--release] [--ipa] [--dry-run]
+    tahoe-compat apple inspect <Foo.app>
 
 NOTES:
     Nothing here executes a Windows or macOS program. `binfmt self-test`
@@ -51,6 +58,7 @@ fn main() -> ExitCode {
         Some("wine") => cmd_wine(&args[1..]),
         Some("mac") => cmd_mac(&args[1..]),
         Some("binfmt") => cmd_binfmt(&args[1..]),
+        Some("apple") => cmd_apple(&args[1..]),
         Some("-h" | "--help") => {
             println!("{USAGE}");
             Ok(())
@@ -321,6 +329,133 @@ fn cmd_binfmt(rest: &[String]) -> Result<(), String> {
             }
         }
         _ => Err(format!("unknown `binfmt` subcommand\n\n{USAGE}")),
+    }
+}
+
+fn cmd_apple(rest: &[String]) -> Result<(), String> {
+    match rest.first().map(String::as_str) {
+        Some("toolchain") => {
+            let toolchain = AppleToolchain::detect();
+            print!("{}", toolchain.describe());
+            Ok(())
+        }
+        Some("project") => {
+            let dir = PathBuf::from(rest.get(1).ok_or("project needs a directory")?);
+            let project = AppleProject::load(&dir).map_err(|e| e.to_string())?;
+            println!("root: {}", project.root.display());
+            println!("product: {}", project.product());
+            println!("bundle id: {:?}", project.manifest.effective_bundle_id());
+            println!("manifest version: {:?}", project.manifest.version);
+            if !project.manifest.unmodelled_keys.is_empty() {
+                println!(
+                    "keys this parser does not model: {:?}",
+                    project.manifest.unmodelled_keys
+                );
+            }
+            println!("app output: {}", project.app_path().display());
+            println!("ipa output: {}", project.ipa_path().display());
+            Ok(())
+        }
+        Some("build") => {
+            let mut dir: Option<PathBuf> = None;
+            let mut request = BuildRequest::default();
+            let mut dry_run = false;
+            let mut it = rest[1..].iter();
+            while let Some(arg) = it.next() {
+                match arg.as_str() {
+                    "--release" => request.configuration = Configuration::Release,
+                    "--ipa" => request.produce_ipa = true,
+                    "--dry-run" => dry_run = true,
+                    "--triple" => {
+                        request.triple = Some(it.next().ok_or("--triple needs a value")?.into())
+                    }
+                    other if other.starts_with('-') => {
+                        return Err(format!("unknown flag: {other}"));
+                    }
+                    other => dir = Some(PathBuf::from(other)),
+                }
+            }
+            let dir = dir.ok_or("build needs a project directory")?;
+            let project = AppleProject::load(&dir).map_err(|e| e.to_string())?;
+            let argv: Vec<String> = project
+                .build_argv(&request)
+                .iter()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect();
+            println!("would run, in {}:", project.root.display());
+            println!("  {}", argv.join(" "));
+            if dry_run {
+                println!(
+                    "
+--dry-run: nothing was executed."
+                );
+                return Ok(());
+            }
+            let toolchain = AppleToolchain::detect();
+            if let Some(missing) = toolchain.first_missing() {
+                // Reported as a normal outcome, not an error: on a machine
+                // without Swift this is expected, and the message says what
+                // to install.
+                println!(
+                    "
+cannot build: {missing}"
+                );
+                return Ok(());
+            }
+            match project.build_and_inspect(&toolchain, &request) {
+                Ok(artifact) => {
+                    println!(
+                        "
+built: {}",
+                        artifact.app.display()
+                    );
+                    println!("  {}", artifact.summary());
+                    if let Some(arch) = &artifact.architecture {
+                        println!("  architecture: {arch}");
+                    }
+                    if let Some(min) = &artifact.bundle.minimum_system_version {
+                        println!("  minimum OS: {min}");
+                    }
+                    Ok(())
+                }
+                Err(AppleBuildError::Prerequisite(missing)) => {
+                    println!(
+                        "
+cannot build: {missing}"
+                    );
+                    Ok(())
+                }
+                Err(e) => Err(e.to_string()),
+            }
+        }
+        Some("inspect") => {
+            let app = PathBuf::from(rest.get(1).ok_or("inspect needs an .app path")?);
+            let artifact = inspect_bundle(&app).map_err(|e| e.to_string())?;
+            println!("app: {}", artifact.app.display());
+            println!("layout: {:?}", artifact.bundle.layout);
+            println!("executable: {}", artifact.bundle.executable.display());
+            println!("bundle id: {:?}", artifact.bundle.identifier);
+            println!("minimum OS: {:?}", artifact.bundle.minimum_system_version);
+            println!("package type: {:?}", artifact.bundle.package_type);
+            println!("is agent: {}", artifact.bundle.is_agent);
+            println!(
+                "architectures in bundle: {:?}",
+                artifact.bundle.architectures
+            );
+            println!("selected architecture: {:?}", artifact.architecture);
+            println!("is 64-bit: {}", artifact.is_64_bit);
+            println!("signed: {}", artifact.is_signed);
+            println!("platform: {:?}", artifact.platform);
+            println!("minimum macOS: {:?}", artifact.minimum_macos);
+            println!("dependencies ({}):", artifact.dependencies.len());
+            for dep in &artifact.dependencies {
+                println!("  {dep}");
+            }
+            println!("\nNOTE: this is an inspection. An iOS bundle links UIKit, which no");
+            println!("Linux runtime implements, so it cannot be executed here.");
+            Ok(())
+        }
+        _ => Err(format!("unknown `apple` subcommand\n\n{USAGE}")),
     }
 }
 

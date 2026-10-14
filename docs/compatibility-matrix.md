@@ -22,7 +22,8 @@
 | XAR (`.pkg`, `.xip`) | `xar!` | header size, version | 2 | **never** — unpack only |
 | OLE2 / `.msi` | `D0CF11E0A1B11AE1` | byte order, sector shift | 2 | via `wine msiexec` (needs Wine) |
 | Plist (XML, `bplist00`) | header / `<plist` | full object graph: strings, ints, reals, bools, arrays, dicts, data, UTF-16 | 14 | **never** — read only |
-| `.app` bundle | directory + `Contents/Info.plist` | `CFBundleExecutable`, identifier, minimum OS, icon, `LSUIElement`, package type, all slice architectures | 9 | the **inner executable**, via Darling |
+| `.app` bundle | directory + plist, **both layouts** | `CFBundleExecutable`, identifier, minimum OS (`LSMinimumSystemVersion` *or* `MinimumOSVersion`), icon, `LSUIElement`, package type, all slice architectures | 12 | the **inner executable**, via Darling (macOS only) |
+| iOS `.app` (flat) | `Foo.app/Info.plist` | as above; `PLATFORM_IOS` reported as such, never as a macOS minimum | 4 | **not executable on Linux** — it links UIKit |
 | Script | `#!` | interpreter **and its arguments** | 6 | yes, via the interpreter |
 | Windows `.lnk` | 76-byte header + CLSID | flags, file attributes, name, relative path, working dir, arguments | 6 | n/a — used for discovery |
 
@@ -88,6 +89,12 @@ Wine variables. A test asserts the documented list does not contain them.
 
 | Capability | Status | Evidence |
 |---|---|---|
+| Bundle layout detection (macOS vs iOS) | implemented | 3 tests, including a cross-layout test |
+| xtool prerequisite detection | implemented, ordered so the SDK is not requested before Swift | 7 tests |
+| `xtool.yml` parsing | implemented | 6 tests, against the committed file |
+| Apple build command construction | implemented, never `--sign` | 4 tests |
+| Inspecting an xtool-shaped iOS bundle | implemented | 6 tests |
+| **Building an Apple app** | **not attempted** | needs Swift 6.4 + an Apple-ID-gated SDK |
 | Mach-O load command parsing | `LC_LOAD_DYLIB`/`WEAK`/`REEXPORT`, `LC_ID_DYLIB`, `LC_RPATH`, `LC_LOAD_DYLINKER`, `LC_UUID`, `LC_MAIN`, `LC_BUILD_VERSION`, `LC_VERSION_MIN_MACOSX`, `LC_CODE_SIGNATURE` | 15 tests |
 | Universal binary slice selection | preference order, then any 64-bit | tested |
 | `arm64e` vs `arm64_32` | distinguished by `cpusubtype` capability bits | tested |
@@ -147,11 +154,11 @@ Wine variables. A test asserts the documented list does not contain them.
 | `tahoe-core` | 7 |
 | `tahoe-format` | 67 |
 | `tahoe-uel` (decisions + supervisor) | 68 |
-| `tahoe-compat` (binfmt, wine, macos) | 115 |
+| `tahoe-compat` (binfmt, wine, macos, xtool) | 148 |
 | `tahoe-compositor` | 80 |
-| `tahoe-shell` | 112 |
+| `tahoe-shell` | 133 |
 | `tahoe-diagnostics` | 8 |
-| **Total** | **457** |
+| **Total** | **511** |
 
 Plus, outside `cargo test`: `wayland-info` against the compositor,
 `tests/verify-preview.py` (11 independent visual assertions), and the

@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+#
+# xtool project configuration.
+#
+# Deliberately minimal. Every key omitted here is one xtool fills in itself,
+# and a value we guess wrong is a build failure we cannot debug on a machine
+# without the iOS SDK.
+#
+# In particular `infoPath` is NOT set. xtool's Packer writes a complete
+# Info.plist with the keys iOS requires (CFBundleIdentifier, MinimumOSVersion
+# from Package.swift, UIDeviceFamily, UILaunchScreen, UIRequiredDeviceCapabilities,
+# CFBundleSupportedPlatforms and the rest). Supplying a partial plist would
+# depend on undocumented merge behaviour. The keys xtool writes are recorded
+# in `reference/Info.plist` for our own parser tests instead.
+
+version: 1
+
+# A reverse-DNS identifier. On a free Apple developer account xtool prefixes
+# this when installing to a device; for `xtool dev build` it is used as-is.
+bundleID: org.tahoe.Gallery
+
+# The SwiftPM product to package into the .app.
+product: TahoeGallery

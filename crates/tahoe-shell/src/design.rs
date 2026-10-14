@@ -10,6 +10,11 @@
 //! radii on floating surfaces, and a restrained accent colour. Values are
 //! plain numbers rather than a framework, so they are usable from a
 //! renderer with no UI toolkit and are trivially unit-testable.
+//!
+//! [`swift`] emits the same tokens as Swift, which is how the SwiftUI
+//! application under `apple/` stays in step with the compositor.
+
+pub mod swift;
 
 /// Straight (non-premultiplied) RGBA colour in linear sRGB components.
 ///
