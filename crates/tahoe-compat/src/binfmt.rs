@@ -487,8 +487,15 @@ exec \"$@\"";
 /// file is a good idea — `tahoe-uel` does that, with a confidence, before
 /// any of this is reached.
 ///
-/// `interpreter` is the directory holding the dispatch helpers, so the
-/// caller controls where they are installed.
+/// `interpreter` is the directory holding `tahoe-dispatch`, so the caller
+/// controls where it is installed.
+///
+/// **One helper for every format.** The alternative — `tahoe-dispatch-wine`
+/// and `tahoe-dispatch-darling` — would bake the magic-to-layer mapping into
+/// the rule, and the magic cannot express it: `ca fe ba be` is also a Java
+/// class file, and `MZ` is also a DOS executable. The helper re-identifies
+/// the file and decides, which is the only place that decision can be made
+/// correctly.
 #[must_use]
 pub fn shipped_rules(interpreter_dir: &Path) -> Vec<Rule> {
     // PE: `MZ` at offset 0. This is what Arch's own wine package
@@ -502,25 +509,14 @@ pub fn shipped_rules(interpreter_dir: &Path) -> Vec<Rule> {
     // do not. Since it is not reachable for *every* PE, the DOS stub is
     // still the honest anchor — a `PE\0\0` rule would silently match only
     // a subset.
-    let pe = Rule::new(
-        "tahoe-wine-pe",
-        b"MZ",
-        interpreter_dir.join("tahoe-dispatch-wine"),
-    );
+    let dispatch = interpreter_dir.join("tahoe-dispatch");
+    let pe = Rule::new("tahoe-wine-pe", b"MZ", &dispatch);
 
     // Mach-O thin, 64-bit little-endian: `cf fa ed fe`.
-    let macho64 = Rule::new(
-        "tahoe-macho64",
-        &[0xcf, 0xfa, 0xed, 0xfe],
-        interpreter_dir.join("tahoe-dispatch-darling"),
-    );
+    let macho64 = Rule::new("tahoe-macho64", &[0xcf, 0xfa, 0xed, 0xfe], &dispatch);
 
     // Mach-O thin, 32-bit little-endian: `ce fa ed fe`.
-    let macho32 = Rule::new(
-        "tahoe-macho32",
-        &[0xce, 0xfa, 0xed, 0xfe],
-        interpreter_dir.join("tahoe-dispatch-darling"),
-    );
+    let macho32 = Rule::new("tahoe-macho32", &[0xce, 0xfa, 0xed, 0xfe], &dispatch);
 
     // Universal binary: `ca fe ba be`. This magic is *also* the Java class
     // file signature, and `binfmt_misc` cannot express "and not a class
@@ -529,11 +525,7 @@ pub fn shipped_rules(interpreter_dir: &Path) -> Vec<Rule> {
     // must re-check the header and hand Java files back to the JVM. Order
     // does not help: this magic shares no bytes with the thin entries, so
     // at most one of them can ever match a given file.
-    let macho_fat = Rule::new(
-        "tahoe-macho-fat",
-        &[0xca, 0xfe, 0xba, 0xbe],
-        interpreter_dir.join("tahoe-dispatch-darling"),
-    );
+    let macho_fat = Rule::new("tahoe-macho-fat", &[0xca, 0xfe, 0xba, 0xbe], &dispatch);
 
     vec![pe, macho64, macho32, macho_fat]
 }

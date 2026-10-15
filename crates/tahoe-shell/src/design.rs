@@ -13,7 +13,11 @@
 //!
 //! [`swift`] emits the same tokens as Swift, which is how the SwiftUI
 //! application under `apple/` stays in step with the compositor.
+//!
+//! [`cosmic`] emits a COSMIC desktop theme, which is how Tahoe can restyle
+//! an existing, maintained compositor instead of owning one.
 
+pub mod cosmic;
 pub mod swift;
 
 /// Straight (non-premultiplied) RGBA colour in linear sRGB components.

@@ -124,6 +124,35 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "Native dispatch path"
+# ---------------------------------------------------------------------------
+#
+# End to end with a stand-in for Wine: the kernel dispatches a real PE to
+# tahoe-dispatch, which execv's the layer. Proves the two-hop chain and that
+# the dispatcher undoes an over-broad magic match.
+
+if timeout 600 tests/dispatch-e2e.sh >/tmp/tahoe-dispatch-e2e.log 2>&1; then
+    D_LAST=$(grep -oE '[0-9]+ passed, [0-9]+ failed' /tmp/tahoe-dispatch-e2e.log | tail -1)
+    ok "kernel → dispatcher → layer, end to end (${D_LAST:-?})"
+else
+    bad "the dispatch path failed"
+    tail -20 /tmp/tahoe-dispatch-e2e.log | sed 's/^/        /'
+fi
+
+# ---------------------------------------------------------------------------
+section "COSMIC theme"
+# ---------------------------------------------------------------------------
+
+if cargo run --quiet -p tahoe-shell --bin tahoe-cosmic-theme -- --list \
+        >/tmp/tahoe-cosmic.log 2>&1; then
+    C_FILES=$(grep -c '/usr/share/cosmic/' /tmp/tahoe-cosmic.log)
+    ok "COSMIC theme tree: $C_FILES files generated"
+else
+    bad "the COSMIC theme generator failed"
+    tail -5 /tmp/tahoe-cosmic.log | sed 's/^/        /'
+fi
+
+# ---------------------------------------------------------------------------
 section "Swift: compile, parse, test"
 # ---------------------------------------------------------------------------
 #
