@@ -4,6 +4,10 @@ An Arch Linux-based distribution with a macOS-Tahoe-styled Wayland desktop and a
 single execution model for Linux ELF, Windows PE, macOS Mach-O/.app, AppImage
 and DMG-delivered applications.
 
+**Where things stand:** [`docs/STATUS.md`](docs/STATUS.md) — what is
+confirmed by running it, what is written but unverified, and what does not
+work. Start there.
+
 **Status: foundation stage.** The architecture, tooling and two working crates
 exist and their tests pass. There is no runnable desktop yet. See
 [ROADMAP.md](ROADMAP.md) for what that means and what comes next.
