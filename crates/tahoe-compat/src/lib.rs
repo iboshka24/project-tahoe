@@ -12,6 +12,9 @@
 //!   reading, DMG packaging. Inspection only; Darling does the running.
 //! - [`binfmt`] — rootless, namespaced `binfmt_misc` dispatch. The kernel
 //!   mechanism, and an honest account of what it cannot express.
+//! - [`proton`] — Valve's game-oriented Wine fork, invoked the way it
+//!   actually expects. Separate from [`wine`] because it is not a drop-in
+//!   replacement and treating it as one produces a worse desktop.
 //! - [`xtool`] — building Apple applications on Linux with xtool, and
 //!   feeding the resulting `.app` back through [`macos`] for inspection.
 //!   This is what turns the macOS parsers from fixture-tested into
@@ -22,6 +25,7 @@
 
 pub mod binfmt;
 pub mod macos;
+pub mod proton;
 pub mod wine;
 pub mod xtool;
 

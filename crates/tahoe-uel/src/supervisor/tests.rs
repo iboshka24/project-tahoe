@@ -46,6 +46,7 @@ fn shell_plan(script: &str) -> CommandPlan {
         env: Vec::new(),
         cwd: None,
         layer: None,
+        ensure_dirs: Vec::new(),
     }
 }
 
@@ -290,6 +291,7 @@ fn arguments_are_never_interpreted_by_a_shell() {
         env: Vec::new(),
         cwd: None,
         layer: None,
+        ensure_dirs: Vec::new(),
     };
     let out = spawn(&cmd, &fast()).expect("spawn");
     assert_eq!(out.stdout, nasty, "the argument must be passed literally");
@@ -504,6 +506,7 @@ fn missing_program_is_reported_before_exec() {
         env: vec![],
         cwd: None,
         layer: None,
+        ensure_dirs: Vec::new(),
     };
     match spawn(&cmd, &fast()) {
         Err(LaunchError::NotFound(p)) => assert_eq!(p, PathBuf::from("/definitely/not/here")),
@@ -528,6 +531,7 @@ fn non_executable_file_is_reported_clearly() {
         env: vec![],
         cwd: None,
         layer: None,
+        ensure_dirs: Vec::new(),
     };
     match spawn(&cmd, &fast()) {
         Err(LaunchError::NotExecutable(p)) => assert_eq!(p, path),
@@ -543,6 +547,7 @@ fn a_directory_is_not_executable() {
         env: vec![],
         cwd: None,
         layer: None,
+        ensure_dirs: Vec::new(),
     };
     assert!(matches!(
         spawn(&cmd, &fast()),

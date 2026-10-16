@@ -242,6 +242,7 @@ fn bench_spawn() -> Vec<Sample> {
         env: vec![],
         cwd: None,
         layer: None,
+        ensure_dirs: Vec::new(),
     };
     let quiet = LaunchPolicy {
         capture: false,

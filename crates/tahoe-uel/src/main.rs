@@ -80,6 +80,27 @@ fn cmd_host() {
             .map_or("-".to_owned(), |p| p.display().to_string())
     );
     println!(
+        "umu_run={}",
+        host.umu_available
+            .as_ref()
+            .map_or("-".to_owned(), |p| p.display().to_string())
+    );
+    println!(
+        "proton_build={}",
+        host.proton_build
+            .as_ref()
+            .map_or("-".to_owned(), |p| p.display().to_string())
+    );
+    // Every build found, not only the preferred one: when the choice looks
+    // wrong the user needs to see what was on offer.
+    for build in tahoe_compat::proton::ProtonInstall::discover() {
+        println!(
+            "proton_candidate={} flavour={:?}",
+            build.root.display(),
+            build.flavour
+        );
+    }
+    println!(
         "darling_path={}",
         layers
             .darling

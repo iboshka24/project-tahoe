@@ -126,6 +126,14 @@ pub struct CommandPlan {
     pub cwd: Option<PathBuf>,
     /// The layer this command goes through, for logging.
     pub layer: Option<&'static str>,
+    /// Directories that must exist before the program starts.
+    ///
+    /// A plan declares what it needs and the supervisor provides it, so the
+    /// planning function stays pure. Proton is the reason this exists: its
+    /// `filelock` opens `<STEAM_COMPAT_DATA_PATH>/pfx.lock` without creating
+    /// the directory first, so a launcher that does not make it fails with
+    /// `FileNotFoundError` before anything runs.
+    pub ensure_dirs: Vec<PathBuf>,
 }
 
 impl CommandPlan {
@@ -159,6 +167,8 @@ pub enum PlanError {
     },
     /// Nothing to execute.
     EmptyProgram,
+    /// Proton's invocation could not be built.
+    Proton(String),
     /// The plan is to inspect a container, which is not a launch.
     InspectOnly {
         /// What kind of container.
@@ -174,6 +184,7 @@ impl std::fmt::Display for PlanError {
             Self::Refused(r) => write!(f, "refused: {r:?}"),
             Self::LayerMissing { layer } => write!(f, "{layer} is not installed"),
             Self::EmptyProgram => write!(f, "empty program path"),
+            Self::Proton(m) => write!(f, "{m}"),
             Self::InspectOnly { kind, hint } => {
                 write!(f, "{kind} is a container, not a program: {hint}")
             }
@@ -200,12 +211,14 @@ pub fn plan_command(
     if program.as_os_str().is_empty() {
         return Err(PlanError::EmptyProgram);
     }
+    let program_path: &Path = program;
     let program = program.as_os_str().to_owned();
     let plain = |argv: Vec<OsString>, layer: Option<&'static str>| CommandPlan {
         argv,
         env: Vec::new(),
         cwd: None,
         layer,
+        ensure_dirs: Vec::new(),
     };
     let need = |name: &'static str, path: Option<&Path>| -> Result<OsString, PlanError> {
         path.map(|p| p.as_os_str().to_owned())
@@ -234,6 +247,46 @@ pub fn plan_command(
             // program is starting; the packager decides when to install them.
             cmd.env
                 .push(("WINEDLLOVERRIDES".into(), "mscoree,mshtml=".into()));
+            Ok(cmd)
+        }
+        Strategy::Proton {
+            build,
+            data_path,
+            use_umu,
+        } => {
+            use tahoe_compat::proton::{ProtonInstall, Verb};
+            let install = ProtonInstall {
+                root: build.clone(),
+                flavour: tahoe_compat::proton::ProtonFlavour::from_path(build),
+                umu: use_umu.clone(),
+            };
+            let mut cmd = if use_umu.is_some() {
+                // umu is the supported route: it recreates the Steam
+                // container environment Proton expects. Its variables are
+                // its own, and it takes the program directly.
+                let (program, env, argv) = install
+                    .umu_argv(data_path, program_path, &[])
+                    .map_err(|e| PlanError::Proton(e.to_string()))?;
+                let mut c = plain(
+                    std::iter::once(program.into_os_string())
+                        .chain(argv)
+                        .collect(),
+                    Some("umu"),
+                );
+                c.env = env;
+                c
+            } else {
+                let argv = install
+                    .argv(Verb::WaitForExitAndRun, program_path, &[])
+                    .map_err(|e| PlanError::Proton(e.to_string()))?;
+                let mut c = plain(argv, Some("proton"));
+                c.env = ProtonInstall::environment(data_path);
+                c
+            };
+            // Proton's `filelock` opens `<data_path>/pfx.lock` without
+            // creating the directory first, and `pfx` itself is created by
+            // the script. Both have to exist before it starts.
+            cmd.ensure_dirs.push(data_path.clone());
             Ok(cmd)
         }
         Strategy::WineInstaller { prefix, package } => {
@@ -462,6 +515,12 @@ pub fn spawn(command: &CommandPlan, policy: &LaunchPolicy) -> Result<LaunchOutco
     {
         use std::os::unix::process::CommandExt;
         cmd.process_group(0);
+    }
+
+    // Create the directories the plan asked for, so a layer that assumes
+    // its prefix exists does not fail on a first run.
+    for dir in &command.ensure_dirs {
+        std::fs::create_dir_all(dir).map_err(LaunchError::Io)?;
     }
 
     let started = Instant::now();

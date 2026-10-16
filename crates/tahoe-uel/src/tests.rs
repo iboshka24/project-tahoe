@@ -25,6 +25,10 @@ fn host() -> HostFacts {
         darling_available: true,
         emulator_available: false,
         flatpak_available: true,
+        // No Proton, so the PE tests exercise the Wine path. The Proton
+        // path has its own tests below.
+        proton_build: None,
+        umu_available: None,
     }
 }
 
@@ -598,4 +602,233 @@ fn appimage_opt_in_runs_with_warning() {
     assert_eq!(plan.strategy, Strategy::Native);
     assert_eq!(plan.confidence, Confidence::Speculative);
     assert!(plan.summary.contains("unsandboxed"));
+}
+
+/// Compile a real PE importing the given DLLs, or `None` when clang or
+/// lld-link is missing.
+///
+/// The import table is what the Wine-versus-Proton decision reads, so the
+/// decision tests need a real one. A hand-built header would test the
+/// heuristic against my understanding of the format rather than against a
+/// linker's output.
+fn pe_fixture(imports: &[&str]) -> Option<PathBuf> {
+    use std::process::Command;
+    let dir = std::env::temp_dir().join("tahoe-uel-pe");
+    std::fs::create_dir_all(&dir).ok()?;
+    let mut hash = 0u64;
+    for name in imports {
+        for byte in name.bytes() {
+            hash = hash
+                .wrapping_mul(1099511628211)
+                .wrapping_add(u64::from(byte));
+        }
+    }
+    let tag = format!("{}-{}", std::process::id(), hash);
+    let ok = |c: &mut Command| c.status().ok().is_some_and(|s| s.success());
+
+    let decls: String = imports
+        .iter()
+        .map(|d| {
+            format!(
+                "__declspec(dllimport) int f_{}(void);\n",
+                d.replace('.', "_")
+            )
+        })
+        .collect();
+    let calls: String = imports
+        .iter()
+        .map(|d| format!("    f_{}();\n", d.replace('.', "_")))
+        .collect();
+    let c_path = dir.join(format!("{tag}.c"));
+    std::fs::write(
+        &c_path,
+        format!("{decls}void mainCRTStartup(void) {{\n{calls}}}\n"),
+    )
+    .ok()?;
+
+    let mut libs = Vec::new();
+    for (i, dll) in imports.iter().enumerate() {
+        let def = dir.join(format!("{tag}-{i}.def"));
+        std::fs::write(
+            &def,
+            format!("LIBRARY {dll}\nEXPORTS\n  f_{}\n", dll.replace('.', "_")),
+        )
+        .ok()?;
+        let lib = dir.join(format!("{tag}-{i}.lib"));
+        if !ok(Command::new("lld-link")
+            .arg("/lib")
+            .arg(format!("/def:{}", def.display()))
+            .arg(format!("/out:{}", lib.display()))
+            .arg("/machine:x64"))
+        {
+            return None;
+        }
+        libs.push(lib);
+    }
+    let obj = dir.join(format!("{tag}.obj"));
+    let exe = dir.join(format!("{tag}.exe"));
+    if !ok(Command::new("clang")
+        .args([
+            "--target=x86_64-pc-windows-msvc",
+            "-ffreestanding",
+            "-fno-stack-protector",
+            "-c",
+        ])
+        .arg(&c_path)
+        .arg("-o")
+        .arg(&obj))
+    {
+        return None;
+    }
+    let mut link = Command::new("lld-link");
+    link.args([
+        "/entry:mainCRTStartup",
+        "/subsystem:console",
+        "/nodefaultlib",
+    ])
+    .arg(format!("/out:{}", exe.display()))
+    .arg(&obj);
+    for lib in &libs {
+        link.arg(lib);
+    }
+    if !ok(&mut link) {
+        return None;
+    }
+    let _ = std::fs::remove_file(c_path);
+    let _ = std::fs::remove_file(obj);
+    for lib in libs {
+        let _ = std::fs::remove_file(lib);
+    }
+    exe.is_file().then_some(exe)
+}
+
+// ---------------------------------------------------------------------------
+// Wine or Proton, decided from the file
+// ---------------------------------------------------------------------------
+
+/// A host with Proton available.
+fn host_with_proton() -> HostFacts {
+    HostFacts {
+        proton_build: Some(PathBuf::from(
+            "/usr/share/steam/compatibilitytools.d/proton-cachyos-slr",
+        )),
+        ..host()
+    }
+}
+
+#[test]
+fn a_game_is_offered_proton_when_it_is_installed() {
+    // The classification comes from the import table of the file on disk,
+    // so this needs a real PE. Skipped when clang is unavailable.
+    let Some(pe) = pe_fixture(&["KERNEL32.dll", "d3d11.dll"]) else {
+        eprintln!("note: clang/lld-link missing; skipping");
+        return;
+    };
+    let plan = decide(
+        &report(ObjectFormat::Pe, Arch::X86_64),
+        &host_with_proton(),
+        &Policy::default(),
+        &pe,
+    );
+    match plan.strategy {
+        Strategy::Proton { .. } => {}
+        other => panic!("a d3d11-importing PE should route to Proton, got {other:?}"),
+    }
+    assert!(matches!(
+        plan.confidence,
+        Confidence::Layer {
+            layer: "proton",
+            ..
+        }
+    ));
+    assert!(plan.summary.contains("game"), "{}", plan.summary);
+    assert!(plan.summary.contains("Proton"), "{}", plan.summary);
+    let _ = std::fs::remove_file(&pe);
+}
+
+#[test]
+fn a_plain_desktop_program_stays_on_wine_even_with_proton_installed() {
+    // This is the point of the whole classification: Proton does not even
+    // execute the program directly, it runs a steam.exe stub, and for a
+    // business application that is machinery that can only hurt.
+    let Some(pe) = pe_fixture(&["KERNEL32.dll", "SHELL32.dll", "COMCTL32.dll"]) else {
+        eprintln!("note: clang/lld-link missing; skipping");
+        return;
+    };
+    let plan = decide(
+        &report(ObjectFormat::Pe, Arch::X86_64),
+        &host_with_proton(),
+        &Policy::default(),
+        &pe,
+    );
+    assert!(
+        matches!(plan.strategy, Strategy::Wine { .. }),
+        "a desktop program must stay on Wine, got {:?}",
+        plan.strategy
+    );
+    let _ = std::fs::remove_file(&pe);
+}
+
+#[test]
+fn a_game_without_proton_is_run_by_wine_and_says_why_it_could_be_better() {
+    let Some(pe) = pe_fixture(&["KERNEL32.dll", "d3d11.dll"]) else {
+        eprintln!("note: clang/lld-link missing; skipping");
+        return;
+    };
+    let plan = decide(
+        &report(ObjectFormat::Pe, Arch::X86_64),
+        &host(),
+        &Policy::default(),
+        &pe,
+    );
+    assert!(matches!(plan.strategy, Strategy::Wine { .. }));
+    assert!(
+        plan.summary
+            .contains("Proton would be the better-tested path"),
+        "the plan should say what would be better: {}",
+        plan.summary
+    );
+    let _ = std::fs::remove_file(&pe);
+}
+
+#[test]
+fn a_file_that_cannot_be_read_falls_back_to_wine_rather_than_failing() {
+    // The import read is best-effort; a launcher must not refuse to run a
+    // program because it could not classify it.
+    let plan = decide(
+        &report(ObjectFormat::Pe, Arch::X86_64),
+        &host_with_proton(),
+        &Policy::default(),
+        Path::new("/definitely/not/here.exe"),
+    );
+    assert!(
+        matches!(plan.strategy, Strategy::Wine { .. }),
+        "{:?}",
+        plan.strategy
+    );
+}
+
+#[test]
+fn proton_requires_cross_os_to_be_allowed() {
+    let Some(pe) = pe_fixture(&["KERNEL32.dll", "dxgi.dll"]) else {
+        eprintln!("note: clang/lld-link missing; skipping");
+        return;
+    };
+    let p = Policy {
+        allow_cross_os: false,
+        ..Policy::default()
+    };
+    let plan = decide(
+        &report(ObjectFormat::Pe, Arch::X86_64),
+        &host_with_proton(),
+        &p,
+        &pe,
+    );
+    assert_eq!(
+        plan.strategy,
+        Strategy::Rejected {
+            reason: RejectionReason::CrossOsDisabled
+        }
+    );
+    let _ = std::fs::remove_file(&pe);
 }

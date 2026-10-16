@@ -25,6 +25,17 @@ pub struct HostFacts {
     pub darling_available: bool,
     /// x86-64 emulator for foreign-arch PE (FEX-Emu or box64) found.
     pub emulator_available: bool,
+    /// The best Proton build found, if any.
+    ///
+    /// Proton is Valve's game-oriented Wine fork: better for games,
+    /// unnecessary machinery for anything else. The *path* is carried rather
+    /// than a count so that [`decide`] stays a pure function of its inputs —
+    /// an earlier version called discovery inside the decision, which made
+    /// it untestable and made a synthetic host fact a lie.
+    pub proton_build: Option<PathBuf>,
+    /// `umu-run`, the supported way to launch Proton outside Steam and what
+    /// Lutris and Bottles moved to.
+    pub umu_available: Option<PathBuf>,
     /// Flatpak available for sandboxed installs.
     pub flatpak_available: bool,
 }
@@ -34,9 +45,13 @@ impl HostFacts {
     #[must_use]
     pub fn probe_current() -> Self {
         fn in_path(name: &str) -> bool {
-            std::env::var_os("PATH").is_some_and(|paths| {
-                std::env::split_paths(&paths).any(|dir| dir.join(name).is_file())
-            })
+            path_of(name).is_some()
+        }
+        fn path_of(name: &str) -> Option<PathBuf> {
+            let paths = std::env::var_os("PATH")?;
+            std::env::split_paths(&paths)
+                .map(|dir| dir.join(name))
+                .find(|p| p.is_file())
         }
         Self {
             host_arch: Arch::host(),
@@ -44,6 +59,10 @@ impl HostFacts {
             darling_available: in_path("darling"),
             emulator_available: in_path("fex-emu") || in_path("box64") || in_path("qemu-x86_64"),
             flatpak_available: in_path("flatpak"),
+            proton_build: tahoe_compat::proton::ProtonInstall::discover()
+                .first()
+                .map(|i| i.root.clone()),
+            umu_available: path_of("umu-run"),
         }
     }
 }
@@ -77,6 +96,21 @@ pub enum Strategy {
     Wine {
         /// Prefix to use (derived, not created here).
         prefix: PathBuf,
+    },
+    /// A Windows game or 3D application, run through Proton.
+    ///
+    /// Distinct from [`Strategy::Wine`] because Proton is invoked
+    /// differently — a verb, its own compat-data directory, and two
+    /// environment variables it reads unguarded — and because the choice is
+    /// made from what the program *imports*, not from a global preference.
+    Proton {
+        /// The build to use, best-first from discovery.
+        build: PathBuf,
+        /// The compat-data directory; the real prefix is this plus `pfx`.
+        data_path: PathBuf,
+        /// Launch through `umu-run` rather than the `proton` script. This is
+        /// the supported route; the direct one is untested upstream.
+        use_umu: Option<PathBuf>,
     },
     /// A Windows installer package, run through `wine msiexec /i`.
     ///
@@ -641,15 +675,6 @@ fn decide_pe(
             ),
         };
     }
-    if !host.wine_available {
-        return ExecutionPlan {
-            strategy: Strategy::Rejected {
-                reason: RejectionReason::LayerMissing { layer: "wine" },
-            },
-            confidence: Confidence::Refused,
-            summary: format!("{}: Windows PE but wine is not installed", source.display()),
-        };
-    }
     // Wine 11's new WoW64 runs 32-bit PE inside a 64-bit process, so x86 PE
     // on an x86-64 host is routine. Any other arch mismatch needs emulation.
     let needs_emu = !matches!(
@@ -689,6 +714,71 @@ fn decide_pe(
             ),
         };
     }
+    // Wine or Proton? The answer comes from the file, not from a setting.
+    //
+    // Proton does not even execute the program directly: its `run` verb
+    // starts a `steam.exe` stub with the program as an argument, seeds the
+    // prefix with Steam client DLLs, and applies per-appid workarounds. For
+    // a game that is the difference between working and not; for a business
+    // application it is machinery that can only hurt. So the classification
+    // is read from the import table, and the launcher says which it chose.
+    let imports = std::fs::read(source)
+        .map(|bytes| tahoe_format::parse_imports(&bytes))
+        .unwrap_or_default();
+    let is_game = imports.kind() == tahoe_format::ProgramKind::Game;
+    if is_game && let Some(build) = &host.proton_build {
+        let data_path = tahoe_compat::proton::ProtonInstall::data_path_for(
+            &source
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "app".to_owned()),
+        );
+        let flavour = tahoe_compat::proton::ProtonFlavour::from_path(build);
+        let route = if host.umu_available.is_some() {
+            "umu-run, the supported route"
+        } else {
+            "the proton script directly, which upstream calls untested"
+        };
+        return ExecutionPlan {
+            strategy: Strategy::Proton {
+                build: build.clone(),
+                data_path,
+                use_umu: host.umu_available.clone(),
+            },
+            confidence: Confidence::Layer {
+                layer: "proton",
+                caveat: "Proton is tuned for games; compatibility varies per title",
+            },
+            summary: format!(
+                "{}: imports {:?}, so it is a game or 3D application; {} launched through {route}",
+                source.display(),
+                imports.names(),
+                flavour.note()
+            ),
+        };
+    }
+    // Only now does Wine matter. Checking earlier refused games on machines
+    // that had Proton but no `wine` on PATH, which is a normal setup: Proton
+    // ships its own Wine and never consults PATH for one.
+    if !host.wine_available {
+        return ExecutionPlan {
+            strategy: Strategy::Rejected {
+                reason: RejectionReason::LayerMissing { layer: "wine" },
+            },
+            confidence: Confidence::Refused,
+            summary: format!(
+                "{}: Windows PE but neither wine nor Proton is installed",
+                source.display()
+            ),
+        };
+    }
+    // Say what would have been better, rather than silently choosing worse.
+    let proton_note = if is_game && host.proton_build.is_none() {
+        " (it imports a graphics API, so Proton would be the better-tested path, but no Proton build was found)"
+    } else {
+        ""
+    };
+
     ExecutionPlan {
         strategy: Strategy::Wine {
             prefix: wine_prefix(),
@@ -697,7 +787,7 @@ fn decide_pe(
             layer: "wine",
             caveat: "Wine runs a subset of Windows software; 32-bit OpenGL has known WoW64 slowdowns",
         },
-        summary: format!("{}: Windows PE via wine", source.display()),
+        summary: format!("{}: Windows PE via wine{proton_note}", source.display()),
     }
 }
 

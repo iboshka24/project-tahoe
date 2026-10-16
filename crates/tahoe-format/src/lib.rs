@@ -27,6 +27,7 @@
 //!   [`ObjectFormat::Ambiguous`] rather than a guess.
 
 pub mod container;
+pub mod pe;
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -34,6 +35,7 @@ use std::path::Path;
 use tahoe_core::{Arch, Endianness, ObjectFormat, OsAbi};
 
 pub use container::{ContainerKind, DmgCompression, DmgTrailer};
+pub use pe::{ImportedDll, PeImports, ProgramKind, parse_imports};
 
 /// How many head bytes [`probe_file`] reads.
 pub const HEAD_LEN: usize = 512;

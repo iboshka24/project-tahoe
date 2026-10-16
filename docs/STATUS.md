@@ -201,7 +201,14 @@ prefix /home/ibrohim/.wine (not initialised):
 
 ## 4. Написано, но НЕ проверено запуском
 
-### 4.1 Windows — обновлено: PE **запущен**
+### 4.1 Windows — PE запущен под Wine **и** под Proton
+
+Подтверждено запуском: настоящий PE, собранный здесь `clang`+`lld-link`,
+проходит полную цепочку и под **Wine 11.0** (`tahoe-pe-ok`, exit 0), и под
+**Proton-CachyOS** (exit 0, 24.9 с, префикс создан, NTSync активен).
+Выбор между ними делается по **таблице импортов** файла: `d3d11`/`dxgi`/
+`vulkan-1`/`steam_api` → Proton, обычные `shell32`/`comctl32` → Wine.
+Подробности — `docs/native-execution.md` и `docs/proton.md`.
 
 22 ноября: Wine 11.0 поставлен user-level Flatpak'ом без root, и **настоящий
 Windows PE** (собранный здесь `clang`+`lld-link`) прошёл полную цепочку
