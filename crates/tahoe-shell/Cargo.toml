@@ -4,3 +4,8 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Tahoe Shell state model: dock, workspaces, launcher index (rendering-independent)"
+
+[dependencies]
+# Pure Rust, Apache-2.0. Parses the TrueType files already on the system, so
+# the shell has no font dependency to ship — only a preference order.
+ab_glyph = "0.2"

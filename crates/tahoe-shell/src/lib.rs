@@ -8,7 +8,8 @@
 
 pub mod design;
 pub mod finder;
-pub mod preview;
+pub mod render;
+pub mod scenes;
 
 use std::collections::BTreeMap;
 

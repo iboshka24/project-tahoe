@@ -77,19 +77,25 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-section "Rendered desktop"
+section "Shell renders"
 # ---------------------------------------------------------------------------
+#
+# The shell's renderer, drawing the desktop from the design system. Checked
+# by decoding the PNG and asking whether it has text in it: a picture with
+# no words is the realistic failure, and a build succeeds either way.
 
-if command -v python3 >/dev/null 2>&1; then
-    if python3 tests/verify-preview.py >/tmp/tahoe-preview.log 2>&1; then
-        CHECKS=$(grep -c '\[ok  \]' /tmp/tahoe-preview.log)
-        ok "desktop preview: $CHECKS independent visual assertions"
+if cargo run --quiet -p tahoe-shell --bin tahoe-preview -- --scene desktop \
+        --out /tmp/tahoe-shell-check.png >/tmp/tahoe-shell-render.log 2>&1; then
+    if python3 tests/verify-shell-render.py /tmp/tahoe-shell-check.png \
+            >/tmp/tahoe-shell-verify.log 2>&1; then
+        ok "the shell renders a desktop with legible text"
     else
-        bad "desktop preview verification"
-        sed 's/^/        /' /tmp/tahoe-preview.log | tail -20
+        bad "the rendered desktop failed verification"
+        sed 's/^/        /' /tmp/tahoe-shell-verify.log | tail -10
     fi
 else
-    skip "desktop preview (python3 not installed)"
+    bad "tahoe-preview failed"
+    tail -5 /tmp/tahoe-shell-render.log | sed 's/^/        /'
 fi
 
 # ---------------------------------------------------------------------------
