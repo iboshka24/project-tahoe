@@ -144,24 +144,37 @@ $ ./target/debug/tahoe-uel probe java8-class
 Три независимые проверки в обе стороны. Расхождение палитры стало
 структурно невозможным.
 
-### 2.8 Рендер рабочего стола
+### 2.8 Рендер рабочего стола — с настоящим текстом
 
 ```
-$ python3 tests/verify-preview.py
-  [ok] panel is a flat material — luminance 94..98
-  [ok] panel darkens the wallpaper it covers
-  [ok] wallpaper is a smooth gradient — max row step 2
-  [ok] wallpaper brightens monotonically
-  [ok] dock is horizontally centred — centre 719, want 720
-  [ok] focused window carries the accent outline — 432 pixels
-  ...
-ALL PREVIEW CHECKS PASSED
+$ python3 tests/verify-shell-render.py ~/Pictures/tahoe/tahoe-desktop-dark.png
+  [ok  ] canonical size — 1600x1000
+  [ok  ] chunk framing — [b'IHDR', b'IDAT', b'IEND']
+  [ok  ] not a flat fill — 725 distinct sampled colours
+  [ok  ] menu-bar text is present — 669 contrasting pixels
+  [ok  ] dock contents are present — 19164 contrasting pixels
+  [ok  ] wallpaper brightens downward — 115 -> 509
+  [ok  ] the panel strip is distinct from the work area — 111 vs 149
+  [ok  ] dock is horizontally centred — centre 799, want 800
+  [ok  ] the accent colour is used — 410 accent-ish pixels
+
+  ALL SHELL RENDER CHECKS PASSED
 ```
 
-11 утверждений, проверенных **независимым декодером** (только `zlib`), а не
-тем же кодом, что рисует.
+9 утверждений, проверенных **независимым декодером** (только `zlib`) — не тем
+кодом, что рисует. Плюс 30+ юнит-тестов на сам рендерер и сцены.
 
-### 2.9 Discovery (Wine)
+**Проверка «текст есть» — не про темноту.** Первая версия считала тёмные
+пиксели и ошибалась в обе стороны: в тёмной теме панель сама тёмная, поэтому
+счётчик измерял фон (11 166 «букв», которых нет), а в светлой приглушённые
+пункты меню слишком светлые, чтобы попасть в счёт (75). Меряется контраст
+относительно доминирующего цвета области, и это ловит реальный отказ —
+молча переставший рисовать шрифт.
+
+5 сцен: рабочий стол, лаунчер и control center в тёмной теме, рабочий стол и
+лаунчер в светлой. Команда и файлы — `docs/shell.md`.
+
+### 2.9 Discovery (Wine)### 2.9 Discovery (Wine)
 
 | Что | Как проверено |
 |---|---|
@@ -187,9 +200,11 @@ prefix /home/ibrohim/.wine (not initialised):
 
 | Команда | Что делает |
 |---|---|
-| `tests/check-all.sh` | все проверки одной командой (15 + 1 skip) |
+| `tests/check-all.sh` | все проверки одной командой (17 + 1 skip) |
 | `tests/swift-env.sh` | ставит Swift 6.4 **без root**, лечит несовместимость с Arch |
-| `tests/verify-preview.py` | независимая проверка рендера рабочего стола |
+| `tests/verify-shell-render.py` | независимая проверка рендера: текст, градиент, dock, акцент |
+| `tests/png-compress.py` | ужимает PNG с 6.4 МБ до ~70 КБ, пиксели не меняются |
+| `tahoe-preview --scene all` | рисует 5 сцен рабочего стола в PNG |
 | `tahoe-compositor` | `--backend headless` / `winit` |
 | `tahoe-uel` | `probe` / `plan` / `run` / `host` |
 | `tahoe-compat` | `binfmt` / `wine` / `mac` / `apple` / `runtime` |
@@ -301,7 +316,7 @@ project-tahoe/
 ├── iso/               профиль archiso
 ├── packages/          PKGBUILDs
 ├── binfmt.d/          правила для системной установки
-└── tests/             check-all.sh, swift-env.sh, verify-preview.py
+└── tests/             check-all.sh, swift-env.sh, verify-shell-render.py
 ```
 
 ---

@@ -166,7 +166,7 @@ Wine variables. A test asserts the documented list does not contain them.
 Plus, outside `cargo test`:
 
 - `wayland-info` against the running compositor;
-- `tests/verify-preview.py` — 11 independent visual assertions;
+- `tests/verify-shell-render.py` — 9 independent visual assertions;
 - `swift test` — 21 Swift tests, and `swiftc -parse` over 11 files;
 - the `tahoe-bench` harness.
 

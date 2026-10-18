@@ -8,8 +8,10 @@ and DMG-delivered applications.
 confirmed by running it, what is written but unverified, and what does not
 work. Start there.
 
-**Status: foundation stage.** The architecture, tooling and two working crates
-exist and their tests pass. There is no runnable desktop yet. See
+**Status: foundation plus.** The architecture, tooling and seven working
+crates exist; their tests pass and the shell renders real scenes with real
+text (see `TODO.md` for what is still ahead). There is no runnable desktop
+session yet — the renderer is not yet a Wayland client. See
 [ROADMAP.md](ROADMAP.md) for what that means and what comes next.
 
 ---
