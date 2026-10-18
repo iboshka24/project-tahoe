@@ -75,6 +75,12 @@ same code that defines the layout and palette. What is missing is the *client*:
       `[tahoe]` packages, `tahoe-2026.10.18-x86_64.iso` (1.7 GiB) uploaded
       as the `tahoe-live` artifact (1-day retention). Boot not yet tried,
       so the fixture itself stays a task:
+- [x] First-party `[tahoe]` packages build from the `v0.1.0` tag and are
+      installed in the ISO (2026-10-18, GitHub run 39162703139:
+      `tahoe-uel-0.1.0-1`, `tahoe-compositor-0.1.0-1`, `tahoe-base-0.1.0-1`
+      in the 504-package list; `tahoe-base` needed `install -d "$pkgdir/etc"`
+      before the `tahoe-release` redirection — commit 52bb15a). The strip
+      "No debugging symbols" note on the release Rust binaries is harmless.
 - [ ] Boot the ISO in a VM and verify the session end to end: Hyprland comes
       up, MacShell renders (Liquid Glass `state: ready` in `qs log`),
       Spotlight/clipboard/emoji IPC works, MacLock unlocks via PAM,

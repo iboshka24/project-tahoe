@@ -28,8 +28,11 @@ the distribution a working macOS-looking desktop *today*, from packages.
 
 Everything MacShell needs is in Arch's own `[extra]` repository as of
 2026-10: `quickshell 0.3.2-1`, `hyprland`, `hyprlock`, `hyprpaper`. The first
-party `[tahoe]` repository is intentionally still there (`tahoe-base`,
-`tahoe-uel`, `tahoe-compositor`), but nothing in the session depends on it.
+party `[tahoe]` repository is also baked in (`tahoe-base`, `tahoe-uel`,
+`tahoe-compositor`): all three build from the `v0.1.0` tag on CI and land in
+the ISO (0.1.0-1, verified in run 39162703139, 2026-10-18). Nothing in the
+session wiring depends on them yet — `tahoe-uel`/`tahoe-compositor` binaries
+are present but unused until the UEL desktop integration task in `TODO.md` §5.
 
 ## 2. How a boot goes
 
