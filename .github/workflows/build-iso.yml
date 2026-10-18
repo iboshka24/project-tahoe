@@ -5,6 +5,12 @@
 # with a 1-day retention and no re-compression so the storage cost stays low.
 # First-party [tahoe] packages that lack their git tag are skipped with a
 # warning by iso/build.sh — its log tells you which ones.
+#
+# Why not jobs.build.container: mkarchiso installs packages into a chroot and
+# must mount /proc inside it; GitHub Actions container jobs run without
+# --privileged, so the mount is denied ("failed to setup chroot"). Instead the
+# job on the hosted runner starts its own privileged Arch container and routes
+# the artifact out via a bind mount.
 name: build-iso
 
 on:
@@ -14,34 +20,39 @@ on:
     paths:
       - 'iso/**'
       - 'packages/**'
+      - 'tests/**'
       - '.github/workflows/build-iso.yml'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: archlinux:base-devel
     steps:
       - name: Check out the profile
         uses: actions/checkout@v4
-
-      - name: Install build tooling
-        run: |
-          pacman -Syu --noconfirm --needed archiso git
 
       - name: Structural checks on the profile
         run: |
           ./tests/check-iso.sh
 
-      - name: Build the ISO
+      - name: Build the ISO in a privileged Arch container
         run: |
-          ./iso/build.sh
+          mkdir -p iso-out
+          docker run --rm --privileged \
+            -v "$GITHUB_WORKSPACE:/repo" \
+            -v "$GITHUB_WORKSPACE/iso-out:/iso-out" \
+            -e TAHOE_OUT_DIR=/iso-out \
+            -w /repo \
+            archlinux:base-devel \
+            bash -c 'pacman -Syu --needed --noconfirm archiso git && ./iso/build.sh'
+
+      - name: Make the artifact readable by the runner user
+        run: sudo chown -R "$(id -u):$(id -g)" iso-out
 
       - name: Publish the ISO as an artifact
         uses: actions/upload-artifact@v4
         with:
           name: tahoe-live
-          path: /tmp/tahoe-out/**/*.iso
+          path: iso-out/**/*.iso
           retention-days: 1
           compression-level: 0
           if-no-files-found: error
