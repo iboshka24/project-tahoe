@@ -1,0 +1,76 @@
+#!/bin/sh
+# macshell-start: starts MacShell for the Hyprland session (the autostart line runs this).
+#   macshell-start [ConfigName]      default: MacShell
+# Your own environment variables go in ~/.config/macshell/env   (for example: export QS_ICON_THEME=Papirus)
+# This is the verbatim upstream script from 0-ss/MacShell install.sh — see
+# iso/macshell-vendor.md for the pinned commit it was taken from.
+NAME="${1:-MacShell}"
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}"
+PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"; export PATH
+
+command -v qs >/dev/null 2>&1 || { echo "macshell-start: qs (quickshell) not found in PATH" >&2; exit 1; }
+
+# wait (up to 20 s) until the Wayland socket exists
+i=0
+while [ "$i" -lt 100 ]; do
+    if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/$WAYLAND_DISPLAY" ]; then break; fi
+    i=$((i + 1)); sleep 0.2
+done
+
+# already running for this user? then there is nothing to do
+if pgrep -u "$(id -u)" -f "(^|/)(qs|quickshell)( .*)? (-c|--config) $NAME( |\$)" >/dev/null 2>&1; then exit 0; fi
+
+# ── environment: the variables Qt and Quickshell need, whatever started this script ──
+export XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-wayland}"
+export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-Hyprland}"
+export XDG_SESSION_DESKTOP="${XDG_SESSION_DESKTOP:-Hyprland}"
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland}"
+# your own settings win over the defaults below
+if [ -f "$CONF/macshell/env" ]; then set -a; . "$CONF/macshell/env"; set +a; fi
+# icon theme: yours (QS_ICON_THEME or qt6ct), else the GTK one, else the first well-known theme that is installed
+if [ -z "${QS_ICON_THEME:-}" ] && [ -z "${QT_QPA_PLATFORMTHEME:-}" ]; then
+    has_theme() { [ -f "/usr/share/icons/$1/index.theme" ] || [ -f "$HOME/.local/share/icons/$1/index.theme" ] || [ -f "$HOME/.icons/$1/index.theme" ]; }
+    t=""
+    for f in "$CONF/gtk-3.0/settings.ini" "$CONF/gtk-4.0/settings.ini"; do
+        [ -n "$t" ] && break
+        [ -f "$f" ] && t=$(sed -n 's/^gtk-icon-theme-name *= *//p' "$f" | head -n1)
+    done
+    if [ -z "$t" ] || ! has_theme "$t"; then
+        t=""
+        for c in Papirus-Dark Papirus WhiteSur-dark WhiteSur Tela Adwaita breeze Numix; do
+            if has_theme "$c"; then t="$c"; break; fi
+        done
+    fi
+    [ -n "$t" ] && export QS_ICON_THEME="$t"
+fi
+# portals and services started later by D-Bus / systemd need to know the session too
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_DESKTOP >/dev/null 2>&1
+fi
+
+# ── wallpaper: awww forgets it at every reboot. If awww was used before (and no other wallpaper tool runs), bring it back
+# now; the shell also re-applies the wallpaper you picked, a few seconds later.
+if command -v awww-daemon >/dev/null 2>&1 && [ -n "$(ls -A "${XDG_CACHE_HOME:-$HOME/.cache}/awww" 2>/dev/null)" ] \
+   && ! pgrep -x hyprpaper >/dev/null 2>&1 && ! pgrep -x swaybg >/dev/null 2>&1 && ! pgrep -x mpvpaper >/dev/null 2>&1; then
+    (
+        awww query >/dev/null 2>&1 || setsid awww-daemon >/dev/null 2>&1 &
+        n=0; while [ "$n" -lt 20 ]; do awww query >/dev/null 2>&1 && break; n=$((n + 1)); sleep 0.25; done
+        awww restore >/dev/null 2>&1
+    ) &
+fi
+
+fast=0
+while :; do
+    start=$(date +%s)
+    qs -c "$NAME"
+    rc=$?
+    case "$rc" in 0|130|143) exit 0 ;; esac          # quit on purpose (qs kill / Ctrl+C / SIGTERM)
+    if [ $(( $(date +%s) - start )) -lt 5 ]; then fast=$((fast + 1)); else fast=0; fi
+    if [ "$fast" -ge 5 ]; then
+        msg="MacShell keeps crashing right after it starts. Run:  qs -c $NAME   and read the log (or: bash install.sh --doctor)."
+        echo "macshell-start: $msg" >&2
+        command -v notify-send >/dev/null 2>&1 && notify-send -u critical "MacShell" "$msg"
+        exit 1
+    fi
+    sleep 1
+done

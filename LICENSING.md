@@ -133,6 +133,8 @@ This is checked in CI (see `docs/testing.md`, "License gate").
 | Darling (`GPL-3.0-or-later`) | Ship its license text; do not modify it without releasing sources |
 | Flatpak (`LGPL-2.1-or-later`) | Dynamic linkage + notices |
 | Smithay (`MIT`) | Preserve the copyright notice |
+| **MacShell** (`MIT`, vendored live desktop) | Ship the MIT text (`LICENSES/MIT.txt`), keep the pinned provenance in `iso/macshell-vendor.md`, vendor the tree unmodified |
+| Hyprland (`BSD-3-Clause`) / Quickshell (`LGPL-3.0-only`) | Session runtime binaries only — pulled by the archiso profile, never linked into first-party code |
 | archiso (`GPL-3.0-or-later`) | Our derived profiles are `GPL-3.0-or-later` compatible |
 | mkinitcpio (`GPL-2.0-only`) | Unmodified use |
 | Linux kernel (`GPL-2.0`) | We do not modify it |

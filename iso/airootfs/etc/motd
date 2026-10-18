@@ -1,0 +1,23 @@
+Project Tahoe — live session (Hyprland + MacShell).
+
+The desktop starts automatically on tty1. For a plain shell press
+Ctrl+Alt+F2 … F6 and log in as `root` (no password on the live image)
+or as `tahoe`.
+
+Keybinds:
+  SUPER+Space   Spotlight            SUPER+Return  terminal (kitty)
+  SUPER+V       clipboard history    SUPER+Q       close window
+  SUPER+period  emoji picker         SUPER+F       float/un-float
+  Alt+Tab       app switcher         SUPER+M       maximize
+  Print         screenshot           SUPER+C       center window
+  Ctrl+Alt+W    wallpaper picker     SUPER+1..5    workspaces
+  SUPER+L       lock screen          SUPER+SHIFT+R reload config
+
+`sudo` works without a password while you are on the live image.
+
+Preinstalled from the Tahoe project: `tahoe-uel` (probe a .exe/.app/.dmg and
+see the honest run plan it would choose) and `tahoe-compositor`. Try:
+
+    tahoe-uel probe /usr/bin/kitty
+
+The desktop is MacShell, vendored from https://github.com/0-ss/MacShell (MIT).

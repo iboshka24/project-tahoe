@@ -159,6 +159,15 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+section "ISO profile (structural)"
+# ---------------------------------------------------------------------------
+#
+# The archiso profile gained a full desktop session; these checks prove the
+# wiring exists and is sane without needing to boot anything.
+
+run "iso profile structure" tests/check-iso.sh
+
+# ---------------------------------------------------------------------------
 section "Swift: compile, parse, test"
 # ---------------------------------------------------------------------------
 #

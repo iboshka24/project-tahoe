@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: 0BSD
+# Maintainer: Project Tahoe
+# STATUS: written 2026-10-18, NOT YET BUILT. pkgver pins a git tag; publish
+# v0.1.0 on GitHub before a real build (see iso/build.sh, which warns).
+#
+# Why this package exists at all: iso/packages.x86_64 lists tahoe-base, so
+# the [tahoe] repository needs something under that name. It is deliberately
+# tiny: a marker + the project readme, no binaries, no deps beyond bash.
+pkgname=tahoe-base
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Project Tahoe base marker package'
+arch=('any')
+url='https://github.com/iboshka24/project-tahoe'
+license=('MIT' 'Apache-2.0')
+source=("git+https://github.com/iboshka24/project-tahoe.git#tag=v$pkgver")
+sha256sums=('SKIP')
+
+package() {
+	cd "project-tahoe"
+	install -Dm644 README.md "$pkgdir/usr/share/doc/tahoe-base/README.md"
+	printf '%s\n' "Project Tahoe ${pkgver}" > "$pkgdir/etc/tahoe-release"
+}

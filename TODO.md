@@ -64,13 +64,27 @@ same code that defines the layout and palette. What is missing is the *client*:
 
 ## 5. Distribution
 
-- [ ] `mkarchiso` in a clean chroot; the profile in `iso/` is written but no
-      ISO has ever been built. First build will take hours → do it detached.
+- [x] `iso/` gained a complete live desktop session (2026-10-18,
+      `docs/iso-session.md`): Hyprland 0.55+ Lua config, vendored MacShell +
+      MacLock (MIT, pinned commit), macshell-start, autologin skel,
+      wallpapers, hyprpaper defaults, NetworkManager/bluetooth service
+      links, conflict-free package list. Parse-checked by
+      `tests/check-iso.sh` (also in `tests/check-all.sh`).
+- [ ] `mkarchiso` in a clean chroot; the profile in `iso/` has a build
+      driver (`iso/build.sh`) and a CI workflow, but no ISO has ever been
+      built. First build will take hours → do it detached.
+- [ ] Boot the ISO in a VM and verify the session end to end: Hyprland comes
+      up, MacShell renders (Liquid Glass `state: ready` in `qs log`),
+      Spotlight/clipboard/emoji IPC works, MacLock unlocks via PAM,
+      wallpaper survives a reboot, dark/light pair applies.
 - [ ] `binfmt.d/` rules installed by the package (rootless namespaced setup is
       in `tests/dispatch-e2e.sh`).
 - [ ] COSMIC theme: regenerate after every design change — `cargo run -p
       tahoe-cosmic-theme` (101 files today). Consider a test for it in
       `tests/check-all.sh` rather than a manual step.
+- [ ] UEL desktop integration: MacShell's Spotlight/launcher still launches
+      apps as normal `.desktop` entries; wiring double-click on a `.exe` /
+      `.app` / `.dmg` into `tahoe-uel` is a separate, carefully scoped task.
 
 ## 6. Known-narrow, do not lose
 

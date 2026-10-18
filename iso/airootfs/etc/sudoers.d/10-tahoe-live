@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Live-maintenance sudo: the live image has no secrets to protect, and the
+# tahoe user needs root for pacman / systemctl without juggling passwords.
+# This file ships ONLY into the live image, never into an installed system.
+tahoe ALL=(ALL:ALL) NOPASSWD: ALL

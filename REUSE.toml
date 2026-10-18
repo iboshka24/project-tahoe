@@ -17,3 +17,23 @@ path = "LICENSES/**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Project Tahoe contributors"
 SPDX-License-Identifier = "CC0-1.0"
+
+# Vendored upstream MacShell/MacLock (https://github.com/0-ss/MacShell).
+# The tree ships unmodified; see iso/macshell-vendor.md for the pin.
+[[annotations]]
+path = "iso/airootfs/etc/skel/.config/quickshell/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Rickky (0-ss/MacShell)"
+SPDX-License-Identifier = "MIT"
+
+# The one upstream script the session depends on, copied verbatim from
+# MacShell's install.sh: macshell-start.
+[[annotations]]
+path = "iso/airootfs/etc/skel/.local/bin/macshell-start"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Rickky (0-ss/MacShell)"
+SPDX-License-Identifier = "MIT"
+
+# First-party session config and shipped wallpapers live under iso/ but
+# carry readable per-file headers where they exist (GPL-3-0-or-later and
+# CC0 as group defaults above).

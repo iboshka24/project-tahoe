@@ -11,7 +11,10 @@ work. Start there.
 **Status: foundation plus.** The architecture, tooling and seven working
 crates exist; their tests pass and the shell renders real scenes with real
 text (see `TODO.md` for what is still ahead). There is no runnable desktop
-session yet — the renderer is not yet a Wayland client. See
+session built from the crates yet — the renderer is not yet a Wayland
+client — but the archiso profile now ships a complete live desktop instead:
+[Hyprland with a vendored MacShell session](https://github.com/0-ss/MacShell)
+(`docs/iso-session.md`). The ISO itself is still not built. See
 [ROADMAP.md](ROADMAP.md) for what that means and what comes next.
 
 ---
@@ -59,7 +62,7 @@ actually own.
 | `tahoe-compositor` | ✅ compiles against Smithay 0.7 | `cargo build -p tahoe-compositor` |
 | `tahoe-shell` | ✅ model implemented (dock/workspaces/launcher index) | `cargo test -p tahoe-shell` |
 | `tahoe-diagnostics` | ✅ read-only probes | `cargo test -p tahoe-diagnostics` |
-| `iso/` archiso profile | 🟡 written, **not yet built** | needs `archiso` installed |
+| `iso/` archiso profile + MacShell live session | 🟡 written, **not yet built** | structural checks: `tests/check-iso.sh`; build: `iso/build.sh` / CI (`docs/iso-session.md`) |
 | `packages/` PKGBUILDs | 🟡 written, **not yet built** | needs `makepkg`/chroot |
 | `binfmt.d/` entries | 🟡 shipped as files, **not registered** | requires root + consent |
 | Tahoe Shell GUI | 🔴 not started | see ROADMAP |
@@ -93,7 +96,8 @@ see [`docs/research/2026-10-13-smithay-build-verification.md`](docs/research/202
 
 ```
 crates/   Rust workspace — compositor, UEL, format parser, shell model
-iso/      archiso profile (GPL-3.0-or-later)
+iso/      archiso profile — Hyprland + vendored MacShell live session
+          (docs/iso-session.md, provenance in iso/macshell-vendor.md)
 packages/ PKGBUILDs (sources 0BSD, per Arch policy)
 binfmt.d/ binfmt_misc entries we ship
 fixtures/ synthetic binaries for the format tests + generator

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Only the iso/ tree is governed here; crates/tests use the defaults.
+#
+# The profile ships POSIX shell scripts and systemd unit text that will be
+# copied verbatim into /home and /etc by mkarchiso — every text file under
+# the profile must be LF on disk, independent of the checkout platform, or
+# bash/chroot break. Vendored MacShell binaries (compiled GPU shaders) and
+# images are marked binary explicitly.
+#
+# Tahoe profile — force LF for everything that lands in /home or /etc:
+iso/airootfs/etc/**                 text eol=lf
+iso/airootfs/etc/skel/.bash_profile text eol=lf
+iso/*.sh                            text eol=lf
+iso/*.conf                          text eol=lf
+iso/macshell-vendor.md              text eol=lf
+iso/packages.x86_64                 text eol=lf
+
+# Vendored MacShell sources (they end up in a Qt/QML runtime, LF expected):
+iso/airootfs/etc/skel/.config/quickshell/**/*.qml   text eol=lf
+iso/airootfs/etc/skel/.config/quickshell/**/*.js    text eol=lf
+iso/airootfs/etc/skel/.config/quickshell/**/*.frag  text eol=lf
+iso/airootfs/etc/skel/.config/quickshell/**/*.svg   text eol=lf
+iso/airootfs/etc/skel/.config/quickshell/**/*.sh    text eol=lf
+iso/airootfs/etc/skel/.config/quickshell/macshell-* text eol=lf
+
+# Vendored MacShell binaries and images must never be EOL-translated:
+iso/airootfs/etc/skel/.config/quickshell/**/*.qsb   binary
+iso/airootfs/etc/skel/Pictures/**                   binary
+iso/airootfs/etc/skel/.config/quickshell/**/assets/** binary

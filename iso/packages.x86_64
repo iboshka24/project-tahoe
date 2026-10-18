@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Tahoe live image package list (x86_64). archiso hard-requires mkinitcpio
-# and mkinitcpio-archiso in this list. STATUS: unbuilt, untested.
+# and mkinitcpio-archiso in this list.
+#
+# STATUS: desktop session added 2026-10-18, ISO still unbuilt. See
+# docs/iso-session.md for the honest list of what was and was not verified.
+
+# ── base ────────────────────────────────────────────────────────────
 base
 linux
 linux-firmware
@@ -11,10 +16,54 @@ systemd
 systemd-sysvcompat
 pacman
 archlinux-keyring
+sudo
+
+# ── first-party packages ([tahoe] repo, see packages/) ──────────────
 tahoe-base
 tahoe-compositor
 tahoe-uel
+
+# ── execution layers + portals ──────────────────────────────────────
 flatpak
 xdg-desktop-portal
 xdg-desktop-portal-gtk
-foot
+xdg-desktop-portal-hyprland
+xdg-utils
+polkit
+
+# ── the desktop: Hyprland + MacShell ────────────────────────────────
+hyprland
+hyprlock
+hyprpaper
+quickshell
+qt6-shadertools
+qt6-svg
+
+# ── sound ───────────────────────────────────────────────────────────
+pipewire
+wireplumber
+pipewire-pulse
+
+# ── network / bluetooth ─────────────────────────────────────────────
+networkmanager
+bluez
+bluez-utils
+
+# ── shell helpers mentioned by MacShell's README ────────────────────
+kitty
+thunar
+papirus-icon-theme
+inter-font
+noto-fonts
+noto-fonts-emoji
+grim
+slurp
+wl-clipboard
+cliphist
+wf-recorder
+libnotify
+brightnessctl
+inotify-tools
+xorg-xwayland
+zenity
+fastfetch

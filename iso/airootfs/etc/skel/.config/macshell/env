@@ -1,0 +1,9 @@
+# Project Tahoe live — environment file read by macshell-start before the
+# shell launches. Same semantics as upstream install.sh's file.
+#
+# Uncomment and edit what you need:
+#
+#   export QS_ICON_THEME=Papirus
+#   export QSG_RHI_BACKEND=opengl
+#   export QSG_RENDER_LOOP=basic
+#   export QT_QUICK_BACKEND=software

@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Build the Tahoe live ISO on every push touching the profile (and on demand).
+#
+# The ISO is ~2.5-3 GiB (kernel + linux-firmware); the artifact is uploaded
+# with a 1-day retention and no re-compression so the storage cost stays low.
+# First-party [tahoe] packages that lack their git tag are skipped with a
+# warning by iso/build.sh — its log tells you which ones.
+name: build-iso
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main]
+    paths:
+      - 'iso/**'
+      - 'packages/**'
+      - '.github/workflows/build-iso.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    steps:
+      - name: Check out the profile
+        uses: actions/checkout@v4
+
+      - name: Install build tooling
+        run: |
+          pacman -Syu --noconfirm --needed archiso git
+
+      - name: Structural checks on the profile
+        run: |
+          ./tests/check-iso.sh
+
+      - name: Build the ISO
+        run: |
+          ./iso/build.sh
+
+      - name: Publish the ISO as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tahoe-live
+          path: /tmp/tahoe-out/**/*.iso
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
