@@ -90,6 +90,13 @@ password on the live image and `tahoe` can `sudo` without one.
 
 ## 6. How to build
 
+> **Windows checkout gotcha:** the two `multi-user.target.wants/*.service`
+> entries are git **symlinks** (mode 120000). They materialize on POSIX
+> checkouts; on a Windows working tree `git status` shows them as deleted
+> while the blobs are safely in the commits — never run `git add -A` from
+> that clone again, or the entries leave the tree. (Pushing the committed
+> tree is always safe.)
+
 Locally (clean Arch chroot or container):
 
 ```sh
