@@ -32,7 +32,9 @@ check_exists() {
 
 check_grep() {
     local label="$1" pattern="$2" file="$3"
-    if grep -qE "$pattern" "$file" 2>/dev/null; then ok "$label"
+    # -e keeps patterns that begin with '-' away from grep's own options,
+    # e.g. '--autologin tahoe' for the agetty auto-login drop-in.
+    if grep -qE -e "$pattern" "$file" 2>/dev/null; then ok "$label"
     else bad "$label (pattern '$pattern' not found in $file)"; fi
 }
 
@@ -177,10 +179,17 @@ fi
 # ---------------------------------------------------------------------------
 printf '\033[1m== Line endings and git modes ==\033[0m\n'
 
+# CR-counting helper: od dumps raw bytes, awk counts the '\r' tokens.
+# (grep is used everywhere else for ERE matches; here it cannot: MSYS
+# builds of grep and of cat-file|grep pipes rewrite line endings on the
+# fly in some Windows environments, so their verdicts about CR bytes are
+# not trustworthy. od reads through no text-mode layer.)
+cr_count() {
+    od -An -c "$1" 2>/dev/null | awk 'BEGIN { c = 0 } { c += gsub(/\\r/, "x") } END { print c + 0 }'
+}
+
 CRLF_FILES=()
-while IFS= read -r f; do
-    CRLF_FILES+=("$f")
-done < <(grep -rl $'\r' -- \
+for f in \
     "$LUA" \
     iso/airootfs/etc/skel/.bash_profile \
     iso/airootfs/etc/skel/.config/macshell/env \
@@ -189,7 +198,11 @@ done < <(grep -rl $'\r' -- \
     iso/airootfs/etc/passwd \
     iso/airootfs/etc/shadow \
     iso/airootfs/etc/sudoers.d/10-tahoe-live \
-    iso/airootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf 2>/dev/null)
+    iso/airootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf ; do
+    if [ "$(cr_count "$f")" -gt 0 ]; then
+        CRLF_FILES+=("$f")
+    fi
+done
 if [[ "${#CRLF_FILES[@]}" -eq 0 ]]; then
     ok "no CRLF endings in the files that must stay POSIX"
 else

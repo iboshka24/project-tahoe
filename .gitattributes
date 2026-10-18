@@ -15,6 +15,10 @@ iso/*.conf                          text eol=lf
 iso/macshell-vendor.md              text eol=lf
 iso/packages.x86_64                 text eol=lf
 
+# Boot loader drops: deeper than iso/*.conf can reach, same rule.
+iso/efiboot/**                      text eol=lf
+iso/syslinux/**                     text eol=lf
+
 # Vendored MacShell sources (they end up in a Qt/QML runtime, LF expected):
 iso/airootfs/etc/skel/.config/quickshell/**/*.qml   text eol=lf
 iso/airootfs/etc/skel/.config/quickshell/**/*.js    text eol=lf

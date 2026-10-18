@@ -96,6 +96,25 @@ password on the live image and `tahoe` can `sudo` without one.
 > while the blobs are safely in the commits — never run `git add -A` from
 > that clone again, or the entries leave the tree. (Pushing the committed
 > tree is always safe.)
+>
+> **Windows local verification:** Git for Windows ships bash — run the
+> structural checks locally with
+> `& 'C:\Program Files\Git\bin\bash.exe' ./tests/check-iso.sh` (PowerShell).
+> Two tool-layer traps these notes exist for:
+>
+> 1. `tests/check-iso.sh`'s CRLF guard counts CR bytes through `od | awk`,
+>    not `grep`: in this MSYS environment both `grep` reading files and
+>    `git grep`/`git cat-file` publishing through pipes rewrite line
+>    endings on the fly, so their verdicts about CR bytes are untrustworthy.
+>    `od` and PowerShell's `[IO.File]::ReadAllBytes` always report truth.
+> 2. A Windows clone that predates the `eol=lf` attributes can hold CRLF
+>    on disk while `git status` still reports clean (both sides normalize
+>    for diff). The committed blobs are already LF; only the working copy
+>    needs converting. Do it byte-wise with PowerShell
+>    (`[IO.File]::ReadAllBytes` → drop CR that precedes LF →
+>    `WriteAllBytes`) — and never with `git reset --hard`: on this clone
+>    that would materialize the two `.wants` symlink entries as files and
+>    re-create the accident from gotcha 1.
 
 Locally (clean Arch chroot or container):
 
