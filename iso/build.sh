@@ -13,9 +13,11 @@
 #      repository and every needed mirror list exists;
 #   3. runs mkarchiso on the profile.
 #
-# STATUS: written 2026-10-18, not yet executed. Treat a first run as the
-# experiment it is and read mkarchiso's errors calmly; see docs/iso-session.md
-# for the honest checklist of what still needs verifying on real hardware.
+# STATUS: first green CI run 2026-10-18 (GitHub run 39159947256): the three
+# [tahoe] packages were skipped for their missing v0.1.0 tags, the fail-soft
+# path ran end to end, and mkarchiso produced tahoe-2026.10.18-x86_64.iso
+# (1.7 GiB) with [extra] packages only. Booting the image is still unverified;
+# see docs/iso-session.md for the honest checklist of what remains.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."          # repository root

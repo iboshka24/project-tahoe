@@ -70,13 +70,17 @@ same code that defines the layout and palette. What is missing is the *client*:
       wallpapers, hyprpaper defaults, NetworkManager/bluetooth service
       links, conflict-free package list. Parse-checked by
       `tests/check-iso.sh` (also in `tests/check-all.sh`).
-- [ ] `mkarchiso` in a clean chroot; the profile in `iso/` has a build
-      driver (`iso/build.sh`) and a CI workflow, but no ISO has ever been
-      built. First build will take hours → do it detached.
+- [x] `mkarchiso` in a clean chroot — done via CI (2026-10-18, GitHub run
+      39159947256): `iso/build.sh` fail-soft on the three tag-less
+      `[tahoe]` packages, `tahoe-2026.10.18-x86_64.iso` (1.7 GiB) uploaded
+      as the `tahoe-live` artifact (1-day retention). Boot not yet tried,
+      so the fixture itself stays a task:
 - [ ] Boot the ISO in a VM and verify the session end to end: Hyprland comes
       up, MacShell renders (Liquid Glass `state: ready` in `qs log`),
       Spotlight/clipboard/emoji IPC works, MacLock unlocks via PAM,
-      wallpaper survives a reboot, dark/light pair applies.
+      wallpaper survives a reboot, dark/light pair applies. First step:
+      download `tahoe-live` from the newest green run of
+      `.github/workflows/build-iso.yml` and checksum it.
 - [ ] `binfmt.d/` rules installed by the package (rootless namespaced setup is
       in `tests/dispatch-e2e.sh`).
 - [ ] COSMIC theme: regenerate after every design change — `cargo run -p

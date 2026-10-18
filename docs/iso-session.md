@@ -79,14 +79,21 @@ password on the live image and `tahoe` can `sudo` without one.
 
 ## 5. What has NOT been verified (be honest, in order)
 
-1. `mkarchiso` has never run — `iso/build.sh` + CI exist, an ISO does not.
-2. The session has never been booted: Hyprland → MacShell on real Wayland,
-   Liquid Glass rendering, Spotlight, widgets, MacLock password check (PAM on
-   the live image), window previews.
+1. The session has never been booted — not on real hardware, not in a VM.
+   CI does produce the ISO (first green run 2026-10-18, run 39159947256:
+   `tahoe-2026.10.18-x86_64.iso`, 1.7 GiB, SYSLINUX + systemd-boot both
+   prepared), but Hyprland → MacShell on real Wayland, Liquid Glass
+   rendering, Spotlight, widgets, MacLock password check (PAM on the live
+   image), window previews are all still claims, not observations.
+2. The artifact has not been downloaded and checksummed by a human, and its
+   1-day retention means it must be re-fetched from the newest green run
+   whenever it is needed.
 3. hi-scaling on laptops (Hyprland monitor config is default only).
-4. Apple Silicon/T2, VM modes, BIOS-era display hardware.
-5. The `[tahoe]` packages are still unbuilt (missing `v0.1.0` tags on GitHub);
-   the build script tolerates their absence and warns.
+4. Apple Silicon/T2, VM modes, BIOS-era display hardware — SYSLINUX is
+   packed for BIOS boot, but no BIOS machine has seen the image.
+5. The `[tahoe]` packages are still unbuilt (missing `v0.1.0` tags on
+   GitHub); the fail-soft skip path around them IS verified — CI ended
+   green with all three warned.
 
 ## 6. How to build
 
@@ -123,8 +130,11 @@ sudo ./iso/build.sh            # TAHOE_OUT_DIR=/somewhere/writable
 $OUT_DIR/…/tahoe-… .iso
 ```
 
-Or let CI do it: `.github/workflows/build-iso.yml` builds on the
-`archlinux:base-devel` container and uploads the ISO as a one-day artifact.
+Or let CI do it: `.github/workflows/build-iso.yml` first runs the structural
+checks on the runner, then starts its own **privileged** `archlinux:base-devel`
+container (a `container:` job cannot mount `/proc` inside mkarchiso's
+install chroot) and uploads the ISO as the `tahoe-live` one-day artifact.
+First green run: 2026-10-18, run 39159947256.
 
 Updating the vendored shell:
 

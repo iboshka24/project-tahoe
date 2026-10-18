@@ -2,8 +2,10 @@
 # Tahoe live image package list (x86_64). archiso hard-requires mkinitcpio
 # and mkinitcpio-archiso in this list.
 #
-# STATUS: desktop session added 2026-10-18, ISO still unbuilt. See
-# docs/iso-session.md for the honest list of what was and was not verified.
+# STATUS: desktop session added 2026-10-18; first green CI build the same
+# day (run 39159947256: tahoe-2026.10.18-x86_64.iso, 1.7 GiB, with the
+# [tahoe] rows skipped for missing tags). Nothing, including boot, verified
+# beyond the build itself — see docs/iso-session.md for the honest list.
 
 # ── base ────────────────────────────────────────────────────────────
 base
