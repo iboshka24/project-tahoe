@@ -19,5 +19,6 @@ sha256sums=('SKIP')
 package() {
 	cd "project-tahoe"
 	install -Dm644 README.md "$pkgdir/usr/share/doc/tahoe-base/README.md"
+	install -d "$pkgdir/etc"
 	printf '%s\n' "Project Tahoe ${pkgver}" > "$pkgdir/etc/tahoe-release"
 }
