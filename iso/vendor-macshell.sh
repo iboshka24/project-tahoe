@@ -11,7 +11,8 @@
 #
 # After updating, refresh the provenance block in iso/macshell-vendor.md
 # (commit, date) and re-read the upstream README's keybind/layer-rule block —
-# is/hyprland.lua keeps a copy of it that should stay in step.
+# airootfs/etc/skel/.config/hypr/hyprland.lua keeps a copy of it that should
+# stay in step.
 set -euo pipefail
 
 REPO_URL="${MACSHELL_URL:-https://github.com/0-ss/MacShell.git}"

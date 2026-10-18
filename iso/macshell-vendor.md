@@ -1,7 +1,7 @@
 # Vendored MacShell — provenance
 
 The live desktop of the Tahoe profile is [MacShell](https://github.com/0-ss/MacShell)
-(mit a matching [MacLock](https://github.com/0-ss/MacShell#maclock) lock screen),
+(with a matching [MacLock](https://github.com/0-ss/MacShell#maclock) lock screen),
 a macOS-Tahoe-style menu bar + Dock + Spotlight + widgets for Hyprland, built
 on [Quickshell](https://quickshell.org). It is MIT-licensed, so it can be
 vendored here as-is with attribution.
