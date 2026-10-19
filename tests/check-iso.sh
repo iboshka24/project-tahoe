@@ -64,6 +64,13 @@ for f in \
     iso/airootfs/etc/motd \
     iso/airootfs/etc/sudoers.d/10-tahoe-live \
     iso/airootfs/etc/systemd/system/getty@tty1.service.d/autologin.conf \
+    iso/airootfs/etc/calamares/settings.conf \
+    iso/airootfs/etc/calamares/branding/tahoe/branding.desc \
+    iso/airootfs/etc/calamares/branding/tahoe/stylesheet.qss \
+    iso/airootfs/etc/calamares/branding/tahoe/show.qml \
+    iso/airootfs/etc/calamares/branding/tahoe/logo.svg \
+    iso/airootfs/etc/calamares/modules/unpackfs.conf \
+    iso/airootfs/usr/share/applications/tahoe-install.desktop \
     iso/macshell-vendor.md ; do
     check_exists "$f" "$f"
 done
@@ -235,6 +242,42 @@ if [[ -n "$PIN_SH" && "$PIN_SH" == "$PIN_DOC" ]]; then
     ok "vendor pin is consistent (script ↔ provenance doc)"
 else
     bad "vendor pin mismatch: script='${PIN_SH:-?}' doc='${PIN_DOC:-?}'"
+fi
+
+# ---------------------------------------------------------------------------
+printf '\033[1m== Installer (Calamares) ==\033[0m\n'
+# ---------------------------------------------------------------------------
+#
+# The installer is Calamares with Tahoe branding. Calamares is AUR-only, so
+# the ISO can legitimately be built without it — but the branding and the
+# launcher are ours and must not drift, and the launch keybind is the only
+# documented way to reach the installer in the live session.
+
+CA=iso/airootfs/etc/calamares
+check_grep "branding names the product"      '^    productName:.*Project Tahoe' "$CA/branding/tahoe/branding.desc"
+check_grep "branding uses the accent token"  '#0A84FF' "$CA/branding/tahoe/stylesheet.qss"
+check_grep "settings.conf selects the branding" '^branding: tahoe' "$CA/settings.conf"
+check_grep "unpackfs reads the live squashfs" 'airootfs.sfs' "$CA/modules/unpackfs.conf"
+check_grep "launcher passes --branding"      'Exec=calamares --branding=tahoe' \
+    iso/airootfs/usr/share/applications/tahoe-install.desktop
+check_grep "the live session can reach it"   'calamares --branding=tahoe' "$LUA"
+check_grep "packages.x86_64 lists calamares" '^calamares$' "$PKG"
+check_grep "build.sh drops calamares when unbuilt" "SKIPPED_PKG.*calamares" iso/build.sh
+
+# Every module named in the exec/show sequences should exist as a config, or
+# Calamares silently falls back to module defaults that were never meant for
+# this image. Only unpackfs is written so far; the rest are a known gap and
+# this check exists to keep them from being forgotten.
+MISSING=()
+while read -r mod; do
+    [[ -z "$mod" ]] && continue
+    [[ -f "$CA/modules/$mod.conf" ]] || MISSING+=("$mod")
+done < <(sed -n '/^sequence:/,/^branding:/p' "$CA/settings.conf" \
+             | grep -oE '^ +- [a-z0-9-]+$' | awk '{print $2}' | sort -u)
+if [[ "${#MISSING[@]}" -eq 0 ]]; then
+    ok "every module named in sequence: has a config file"
+else
+    skip "${#MISSING[@]} module config(s) not written yet (Calamares defaults apply): ${MISSING[*]:0:6} …"
 fi
 
 # ---------------------------------------------------------------------------

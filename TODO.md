@@ -116,6 +116,24 @@ same code that defines the layout and palette. What is missing is the *client*:
       apps as normal `.desktop` entries; wiring double-click on a `.exe` /
       `.app` / `.dmg` into `tahoe-uel` is a separate, carefully scoped task.
 
+## 5a. A graphical installer (asked for: "like CachyOS")
+
+CachyOS ships **Calamares** plus its own branding; so does Tahoe now, except
+for the program itself. `docs/iso-installer.md` has the whole picture.
+
+- [x] Branding in the design system's palette, module sequence, `unpackfs`
+      install, launcher, `SUPER + I`, checks in `tests/check-iso.sh`.
+- [ ] **`calamares` is not in Arch's repositories** (verified: 0 results in
+      the packages API, absent from the extra listing; AUR only). It must be
+      built in CI from the AUR, or taken from a binary repository, or dropped
+      in favour of the in-repo `archinstall` (a text menu). `build.sh` already
+      drops it when it is missing, so the ISO builds either way.
+- [ ] Write the 20 module configs (`users`, `bootloader`, `partition`, …);
+      only `unpackfs.conf` exists, so the rest would use upstream defaults
+      written for other distributions.
+- [ ] Do a whole install in a VM and boot the result. **Until that is
+      photographed, do not install to hardware.**
+
 ## 6. Known-narrow, do not lose
 
 - [ ] Proton's child stdout does not reach the supervisor's capture (Wine's

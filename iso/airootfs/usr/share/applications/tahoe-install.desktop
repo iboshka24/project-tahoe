@@ -1,0 +1,10 @@
+[Desktop Entry]
+# SPDX-License-Identifier: 0BSD
+Type=Application
+Name=Install Project Tahoe
+Comment=Install the system to this computer
+Exec=calamares --branding=tahoe
+Icon=calamares
+Terminal=false
+Categories=System;
+StartupNotify=true

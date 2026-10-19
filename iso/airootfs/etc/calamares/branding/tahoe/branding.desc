@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Calamares branding for Project Tahoe.
+#
+# This is the part that makes an installer look like a distribution rather
+# than like Calamares. CachyOS does the same thing: Calamares upstream plus a
+# branding directory of their own. The colours here are not invented — they
+# are the tokens from the Rust design system (crates/tahoe-shell/src/design.rs),
+# the same values the compositor, the COSMIC theme and the SwiftUI app read.
+---
+componentName:  tahoe
+
+strings:
+    productName:         "Project Tahoe"
+    shortProductName:    "Tahoe"
+    version:             "0.2"
+    shortVersion:        "0.2"
+    versionedName:       "Project Tahoe 0.2"
+    shortVersionedName:  "Tahoe 0.2"
+    bootloaderEntryName: "Tahoe"
+    productUrl:          "https://github.com/iboshka24/project-tahoe"
+    supportUrl:          "https://github.com/iboshka24/project-tahoe/issues"
+    releaseNotesUrl:     "https://github.com/iboshka24/project-tahoe/blob/master/docs/STATUS.md"
+
+images:
+    productLogo:    "logo.svg"
+    productIcon:    "logo.svg"
+    productWelcome: "welcome.svg"
+
+# The window is the first thing anyone sees of the distribution; it uses the
+# same palette as the desktop so the installer does not look like a different
+# product.
+style:
+    sidebarBackground:    "#1C1C22"
+    sidebarText:          "#F5F5F7"
+    sidebarTextSelect:    "#0A84FF"
+    sidebarTextHighlight: "#0A84FF"
+
+slideshow: show.qml

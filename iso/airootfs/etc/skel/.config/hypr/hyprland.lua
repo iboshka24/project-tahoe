@@ -96,6 +96,11 @@ for i = 1, 5 do
     hl.bind("SUPER + SHIFT + " .. ws,   hl.dsp.window.move({ workspace = ws }))
 end
 
+-- installer: SUPER+I (the live image's whole purpose is to be installed)
+-- calamares is not in Arch's repositories, so the ISO either has it or does
+-- not; if the package is missing the bind simply fails to launch anything.
+hl.bind("SUPER + I", hl.dsp.exec_cmd("calamares --branding=tahoe"))
+
 -- reload: SUPER+SHIFT+R
 --
 -- REMOVED: hl.dsp.reload_config(). The live session reported

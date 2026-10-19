@@ -25,6 +25,15 @@ tahoe-base
 tahoe-compositor
 tahoe-uel
 
+# ── the installer ───────────────────────────────────────────────────
+# Calamares, the same installer CachyOS and most Arch derivatives brand.
+# NOT in Arch's repositories (verified: 0 results in the packages API, absent
+# from the extra listing) — it lives in the AUR, so it has to be built or
+# taken from a binary repository before this line can resolve. build.sh drops
+# it when it is unavailable and the ISO still builds; see
+# docs/iso-installer.md for the decision this is waiting on.
+calamares
+
 # ── execution layers + portals ──────────────────────────────────────
 flatpak
 xdg-desktop-portal

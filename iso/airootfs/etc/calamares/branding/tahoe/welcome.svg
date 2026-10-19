@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Tahoe mark: two ridges and a lake, in the design system's accent. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" rx="28" fill="#1C1C22"/>
+  <path d="M20 84 L48 40 L64 62 L80 34 L108 84 Z" fill="#0A84FF"/>
+  <path d="M20 92 h88 a4 4 0 0 1 0 12 h-88 a4 4 0 0 1 0-12 z" fill="#F5F5F7" opacity="0.75"/>
+</svg>

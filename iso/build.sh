@@ -108,6 +108,17 @@ else
     warn "no [tahoe] packages were built; the ISO proceeds without them"
 fi
 
+# A package that no PKGBUILD in packages/ produces cannot be "skipped" by the
+# loop above — mkarchiso would fail on it with "target not found". The
+# installer is the one entry like that (calamares is AUR-only, see
+# docs/iso-installer.md), so it is dropped from the profile copy when the
+# local repository does not have it, exactly as unbuilt first-party packages
+# are, and the ISO keeps building without it.
+if ! compgen -G "$REPO_DIR/calamares-*.pkg.tar.*" >/dev/null; then
+    warn "calamares is not in the local repository: the ISO will have no installer"
+    SKIPPED_PKG+=("calamares")
+fi
+
 # ── 2. build-time pacman.conf ──────────────────────────────────────────────
 say "preparing the build pacman.conf"
 BUILD_PACMAN_CONF="$WORK_DIR/tahoe-build-pacman.conf"

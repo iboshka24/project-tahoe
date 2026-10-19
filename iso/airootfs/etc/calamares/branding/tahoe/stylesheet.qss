@@ -1,0 +1,20 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Calamares Qt stylesheet, Tahoe palette.
+ * Accent #0A84FF, panel #1C1C22, text #F5F5F7 — the same tokens the shell
+ * renders with.
+ */
+QMainWindow, QDialog, QWidget { background: #1C1C22; color: #F5F5F7; }
+QPushButton {
+    background: #0A84FF; color: #FFFFFF; border: none; border-radius: 8px;
+    padding: 8px 18px; font-weight: 600;
+}
+QPushButton:disabled { background: #3A3A44; color: #8A8A96; }
+QPushButton:hover:!disabled { background: #2E97FF; }
+QLineEdit, QComboBox, QSpinBox, QTextEdit {
+    background: #25252C; border: 1px solid #3A3A44; border-radius: 8px;
+    padding: 6px; color: #F5F5F7;
+}
+QProgressBar { background: #25252C; border-radius: 6px; }
+QProgressBar::chunk { background: #0A84FF; border-radius: 6px; }
+QListView { background: #25252C; border-radius: 8px; }
+QListView::item:selected { background: #0A84FF; color: #FFFFFF; }
