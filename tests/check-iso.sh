@@ -51,6 +51,7 @@ for f in \
     iso/airootfs/etc/skel/.config/macdock/settings.json \
     iso/airootfs/etc/skel/.bash_profile \
     iso/airootfs/etc/skel/.local/bin/macshell-start \
+    iso/airootfs/usr/local/bin/tahoe-installer \
     iso/airootfs/etc/skel/.config/quickshell/MacShell/shell.qml \
     iso/airootfs/etc/skel/.config/quickshell/MacShell/MacBar.qml \
     iso/airootfs/etc/skel/.config/quickshell/MacShell/MacDock.qml \
@@ -71,6 +72,7 @@ for f in \
     iso/airootfs/etc/calamares/branding/tahoe/logo.svg \
     iso/airootfs/etc/calamares/modules/unpackfs.conf \
     iso/airootfs/usr/share/applications/tahoe-install.desktop \
+    iso/airootfs/usr/local/bin/tahoe-installer \
     iso/macshell-vendor.md ; do
     check_exists "$f" "$f"
 done
@@ -202,6 +204,7 @@ for f in \
     iso/airootfs/etc/skel/.config/macshell/env \
     iso/airootfs/etc/skel/.config/hypr/hyprpaper.conf \
     iso/airootfs/etc/skel/.local/bin/macshell-start \
+    iso/airootfs/usr/local/bin/tahoe-installer \
     iso/airootfs/etc/passwd \
     iso/airootfs/etc/shadow \
     iso/airootfs/etc/sudoers.d/10-tahoe-live \
@@ -258,9 +261,14 @@ check_grep "branding names the product"      '^    productName:.*Project Tahoe' 
 check_grep "branding uses the accent token"  '#0A84FF' "$CA/branding/tahoe/stylesheet.qss"
 check_grep "settings.conf selects the branding" '^branding: tahoe' "$CA/settings.conf"
 check_grep "unpackfs reads the live squashfs" 'airootfs.sfs' "$CA/modules/unpackfs.conf"
-check_grep "launcher passes --branding"      'Exec=calamares --branding=tahoe' \
+check_grep "launcher goes through the wrapper" '^Exec=tahoe-installer$' \
     iso/airootfs/usr/share/applications/tahoe-install.desktop
-check_grep "the live session can reach it"   'calamares --branding=tahoe' "$LUA"
+check_grep "the live session can reach it"   'tahoe-installer' "$LUA"
+# Unprivileged Calamares refuses to install, and a sudo that drops the display
+# environment starts a Calamares with no window — both look like a broken
+# launcher rather than a broken wrapper, so the wrapper is checked.
+check_grep "wrapper elevates"                'sudo -n' iso/airootfs/usr/local/bin/tahoe-installer
+check_grep "wrapper keeps the display env"   'preserve-env=' iso/airootfs/usr/local/bin/tahoe-installer
 check_grep "packages.x86_64 lists calamares" '^calamares$' "$PKG"
 check_grep "build.sh drops calamares when unbuilt" "SKIPPED_PKG.*calamares" iso/build.sh
 

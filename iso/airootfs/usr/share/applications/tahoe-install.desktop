@@ -3,7 +3,9 @@
 Type=Application
 Name=Install Project Tahoe
 Comment=Install the system to this computer
-Exec=calamares --branding=tahoe
+# Not `calamares --branding=tahoe` directly: see usr/local/bin/tahoe-installer
+# for why it needs a wrapper (root, and the session's Wayland environment).
+Exec=tahoe-installer
 Icon=calamares
 Terminal=false
 Categories=System;

@@ -1,0 +1,23 @@
+#!/bin/sh
+# SPDX-License-Identifier: 0BSD
+# Start the installer.
+#
+# Two things Calamares needs and a plain Exec line does not give it:
+#
+#   * root. It partitions and mounts; unprivileged it exits instead of
+#     installing. The live image's tahoe user has NOPASSWD sudo
+#     (etc/sudoers.d/10-tahoe-live, which is shipped only into the live
+#     image), so -n is enough and cannot hang on a prompt.
+#
+#   * the session's display environment. sudo resets it by default, and a
+#     Calamares that cannot see WAYLAND_DISPLAY opens no window at all — it
+#     runs, does nothing visible, and looks like a broken launcher. Only the
+#     variables a Qt application needs to find the compositor are preserved.
+#
+# A wrapper rather than a longer Exec line because the same command has to be
+# reachable from the app menu and from the session's keybind, and one place to
+# fix is better than two.
+set -eu
+
+PRESERVE="WAYLAND_DISPLAY,DISPLAY,XDG_RUNTIME_DIR,QT_QPA_PLATFORM,XDG_SESSION_TYPE"
+exec sudo -n --preserve-env="$PRESERVE" calamares --branding=tahoe "$@"

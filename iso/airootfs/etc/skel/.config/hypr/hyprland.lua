@@ -99,7 +99,7 @@ end
 -- installer: SUPER+I (the live image's whole purpose is to be installed)
 -- calamares is not in Arch's repositories, so the ISO either has it or does
 -- not; if the package is missing the bind simply fails to launch anything.
-hl.bind("SUPER + I", hl.dsp.exec_cmd("calamares --branding=tahoe"))
+hl.bind("SUPER + I", hl.dsp.exec_cmd("tahoe-installer"))
 
 -- reload: SUPER+SHIFT+R
 --
