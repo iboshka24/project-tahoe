@@ -127,7 +127,16 @@ for name in "${AUR_PKGS[@]}"; do
         # Install it, so the next package in the list can link against it.
         pacman -U --noconfirm "$REPO_DIR/aur/$name"/*.pkg.tar.* >/dev/null ||
             warn "$name built but did not install; a dependent may fail"
-        echo "built $name at $(git -C "$REPO_DIR/aur/$name" rev-parse HEAD)"
+        # The revision is the reproducibility pin, so it has to be readable:
+        # git refuses to inspect a directory owned by another user ("dubious
+        # ownership"), and the clone belongs to the build user, so ask as that
+        # user. An empty hash here means the pin was silently lost.
+        AUR_REV="$(runuser -u "$BUILD_USER" -- git -C "$REPO_DIR/aur/$name" rev-parse HEAD 2>/dev/null)"
+        if [[ -n "$AUR_REV" ]]; then
+            echo "built $name at $AUR_REV"
+        else
+            warn "$name built, but its revision could not be read for the record"
+        fi
     else
         warn "could not build $name; the installer will be missing from the ISO"
         AUR_FAILED+=("$name")

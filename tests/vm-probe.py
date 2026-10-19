@@ -101,7 +101,8 @@ def build_qemu(args: argparse.Namespace, monitor_path: Path) -> list[str]:
         "-serial", "file:" + str(args.out / "serial.log"),
         "-drive", f"file={args.iso},media=cdrom,readonly=on,format=raw",
         "-boot", "d",
-    ]
+    ] + (["-drive", f"file={args.disk},if=virtio,format=raw,cache=unsafe"]
+         if args.disk else [])
 
 
 def main() -> int:
@@ -116,6 +117,13 @@ def main() -> int:
     ap.add_argument("--qemu", default="", help="an explicit qemu command line prefix")
     ap.add_argument("--commands", nargs="*", default=[],
                     help="shell commands to type, one screenshot each")
+    ap.add_argument("--keys", nargs="*", default=[],
+                    help="raw QEMU key chords to send, e.g. meta_l-i for Super+I; "
+                         "one screenshot after each. Chords are raw because the "
+                         "keyboard map below only covers characters a shell command "
+                         "needs, and a modifier combination is not a character.")
+    ap.add_argument("--disk", default="",
+                    help="attach this file as a virtio disk (created sparse if absent)")
     args = ap.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -134,6 +142,15 @@ def main() -> int:
         mon.cmd(f"screendump {args.out}/probe-000-boot.ppm")
         print(f"waiting {args.boot_wait:.0f}s for the guest…")
         time.sleep(args.boot_wait)
+
+        # Raw chords first: this is how the live session's SUPER+I reaches the
+        # installer without a terminal to type in.
+        for index, chord in enumerate(args.keys, start=1):
+            mon.cmd(f"screendump {args.out}/probe-key-{index:03d}-before.ppm")
+            mon.cmd(f"sendkey {chord}")
+            print(f"sent chord: {chord}")
+            time.sleep(6.0)
+            mon.cmd(f"screendump {args.out}/probe-key-{index:03d}.ppm")
 
         for index, command in enumerate(args.commands, start=1):
             mon.cmd(f"screendump {args.out}/probe-{index:03d}-before.ppm")

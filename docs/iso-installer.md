@@ -1,9 +1,11 @@
 # The installer: Calamares, like CachyOS — and the one thing blocking it
 
-> Status: **scaffold only. There is no installer in the ISO yet, and the
-> install path has never run.** The branding, the module sequence, the
-> launcher and the checks are in the repository; the program they configure is
-> not, because it is not packaged in Arch.
+> Status: **the installer program is in the ISO; the install itself has never
+> run.** Calamares 3.4.2 builds from the AUR in CI and lands in the image
+> (verified in run 39265708121: `built calamares at …`, then
+> `installing calamares…`, and `calamares-3.4.2-2` in the package list
+> alongside `kpmcore-26.08.2`, `polkit-qt6` and `qt6-declarative`). What is
+> still missing is the 20 module configs and any end-to-end install.
 >
 > Date: 2026-10-19.
 
@@ -63,17 +65,17 @@ $ grep -c calamares <the extra/ mirror listing>
 graphical installer that was asked for. Calamares lives in the AUR, which
 means a binary cannot simply be installed — one of these has to happen:
 
-1. **Build it ourselves in CI** from the AUR (`kpmcore`, then `calamares`,
-   both CMake/Qt6). This is what a distribution does, and it is the
-   architecture the rest of the project follows: first-party packaging of a
-   third-party program, MIT/GPL kept at a process boundary. It costs CI time
-   and it will take a couple of iterations to get the dependency order right.
-2. **Take it from a binary repository that already packages it** (CachyOS's,
-   for instance). Faster, verifiable today, but it makes our ISO depend on
-   another distribution's rolling repository — a decision that should be made
-   deliberately, not as a shortcut.
-3. Go without, and ship `archinstall` — honest, in-repo, and not what was
-   asked for.
+1. ~~Build it ourselves in CI from the AUR~~ — **chosen, and working.**
+   `iso/build.sh` clones the AUR package as the build user, installs its
+   dependencies as root and runs makepkg into the same local repository the
+   first-party packages land in. One package, not two: the AUR `kpmcore`
+   repository is empty, and kpmcore turns out to be in `extra` at 26.08.2, so
+   `AUR_PKGS=(calamares)` and every dependency comes from a signed repository.
+   Verified present in the ISO by the build log and the package list.
+2. ~~Take it from a binary repository~~ — rejected by the decision above; it
+   would make our ISO depend on another distribution's rolling repository.
+3. ~~Go without, ship `archinstall`~~ — it is in `extra`, but it is a text
+   menu, not the graphical installer that was asked for.
 
 `iso/build.sh` already handles the "no installer" case: first-party packages
 that fail to build are dropped from a sanitized profile copy, and `calamares`
@@ -88,12 +90,14 @@ ISO picks it up.
       upstream defaults for things like `users` and `bootloader` — defaults
       written for other distributions. `tests/check-iso.sh` reports the list
       and skips (82 passed, 1 skipped).
-- [ ] **The package.** Nothing in the repository produces `calamares` yet; see
-      the decision above.
+- [ ] **Pin the AUR revision.** The build records the commit it built, but
+      the clone takes AUR HEAD, so two builds of the same commit of *this*
+      repository can produce different installer versions. MacShell is pinned
+      by commit (`iso/macshell-vendor.md`); calamares should be too.
 - [ ] **A whole install, in a VM.** Boot the ISO with an empty disk, run the
       installer, then boot what it produced. Until that has been done and
-      photographed, the honest statement is "the installer does not exist
-      yet", and **nobody should install to hardware**.
+      photographed, the honest statement is "the installer runs but has never
+      installed anything", and **nobody should install to hardware**.
 - [ ] Which bootloader, and for which firmware: `bootloader` handling both
       EFI and BIOS from an image whose own UEFI path has never been booted is
       optimistic.
