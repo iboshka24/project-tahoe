@@ -238,6 +238,39 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+printf '\033[1m== Kernel command line ==\033[0m\n'
+# ---------------------------------------------------------------------------
+#
+# The parameters on the kernel command line are not free-form: the archiso
+# hook reads a specific set, and a name it does not know is *silently
+# ignored*, after which the initramfs cannot find its own medium and drops to
+# "ERROR: '' device did not show up after 30 seconds". The built ISO shipped
+# `img_label=`, which belongs to the archiso_loop_mnt hook (booting from an
+# ISO file, and it needs img_loop= too) — so nothing read it and the image did
+# not boot on any machine, which no structural check noticed until one booted
+# it. This is that check.
+
+for cfg in iso/syslinux/syslinux.cfg iso/efiboot/loader/entries/tahoe.conf; do
+    if grep -qE '(^|[[:space:]])(APPEND|options)[[:space:]].*archisolabel=' "$cfg"; then
+        ok "$(basename "$cfg") passes archisolabel (read by the archiso hook)"
+    else
+        bad "$(basename "$cfg") does not pass archisolabel — the archiso hook will not find the medium"
+    fi
+    if grep -qE '[[:space:]]img_label=' "$cfg"; then
+        bad "$(basename "$cfg") passes img_label, which only the loop-mount hook reads"
+    else
+        ok "$(basename "$cfg") does not pass img_label"
+    fi
+done
+
+if grep -q 'systemd.firstboot=no' iso/syslinux/syslinux.cfg &&
+   grep -q 'systemd.firstboot=no' iso/efiboot/loader/entries/tahoe.conf; then
+    ok "both entries suppress the first-boot prompt (else the desktop never starts)"
+else
+    bad "systemd.firstboot=no is missing from a boot entry"
+fi
+
+# ---------------------------------------------------------------------------
 printf '\n\033[1m%d passed, %d failed, %d skipped\033[0m\n' \
     "$pass" "${fail}" "${skipped:-0}"
 [[ "$fail" -eq 0 ]] || exit 1

@@ -97,7 +97,14 @@ for i = 1, 5 do
 end
 
 -- reload: SUPER+SHIFT+R
-hl.bind("SUPER + SHIFT + R",   hl.dsp.reload_config())
+--
+-- REMOVED: hl.dsp.reload_config(). The live session reported
+--   "attempt to call a nil value (field 'reload_config')"
+-- and because a Lua error aborts the whole config, every window rule and
+-- layer rule below this line never applied. The reload bind is a
+-- convenience; a config that stops halfway is not. If the API grows a reload
+-- dispatcher, put it back with the same key and re-test in a VM — there is
+-- no way to notice it is missing except by looking at the session.
 
 -- ── window rules ──────────────────────────────────────────────────────────
 -- GTK's pickers and the Qt/zenity file dialogs float, so they do not end up

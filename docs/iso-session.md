@@ -1,12 +1,13 @@
 # docs/iso-session.md — the live desktop session
 
-> Status: **written, verified structurally, not verified by booting.**
-> `tests/check-iso.sh` proves every file the profile references exists, is
-> syntactically sane and wired up; nothing here has yet been confirmed by
-> actually booting the ISO on hardware or a VM. The first `mkarchiso` run is
-> the next milestone (see "How to build" and TODO.md §5).
+> Status: **booted in QEMU on 2026-10-19, with three defects found and fixed.**
+> `tests/check-iso.sh` (67 checks) proves every file the profile references
+> exists, is syntactically sane and wired up; booting it is what found that the
+> kernel command line named a parameter no hook reads, that the first-boot
+> prompt held the desktop, and that the session config aborted at line 100.
+> All the evidence is in [`iso-boot.md`](iso-boot.md).
 >
-> Date: 2026-10-18.
+> Date: 2026-10-18, revised 2026-10-19.
 
 ---
 
@@ -42,6 +43,8 @@ syslinux / systemd-boot
    └─ getty@tty1 (autologin.conf → auto-login as `tahoe`)
       └─ login shell reads /home/tahoe/.bash_profile
          └─ exec Hyprland           (only on tty1, only once, see TAHOE_SESSION)
+            [needs systemd.firstboot=no, or the boot stops at the
+             systemd-firstboot prompt before tty1 reaches bash_profile]
             └─ hyprland.lua
                ├─ hl.exec_cmd("hyprpaper")            → ships wallpaper
                ├─ hl.exec_cmd("sh ~/.local/bin/macshell-start")
@@ -75,7 +78,7 @@ password on the live image and `tahoe` can `sudo` without one.
 | Claim | Evidence |
 |---|---|
 | Every referenced file exists, is sane, has the right git mode | `tests/check-iso.sh` (also wired into `tests/check-all.sh`) |
-| The `hl.*` calls used are real API of Hyprland 0.55 | checked against Hyprland 0.55 docs (dispatchers, layer rules, `hl.config`, `hl.env`/`hl.bind`) and against `MacShell` upstream `install.sh`, which writes the same forms |
+| The `hl.*` calls used are real API of Hyprland 0.55 | **partly wrong, found by booting:** `hl.dsp.reload_config` is nil (`hyprland.lua:100`), and because a Lua error aborts the file, everything after it never ran. Lines above 100 demonstrably work: `hl.env`, `hl.config`, `hl.bind`, `hl.exec_cmd` and the autostart all took effect |
 | MacShell's requirements are in `[extra]` | quickshell 0.3.2-1 listed at archlinux.org (checked 2026-10-18) |
 | Shell scripts parse | `sh -n` / `bash -n` inside `tests/check-iso.sh` |
 | The vendored tree matches its signed provenance | `check-iso.sh` compares `macshell-vendor.md` to the pinned ref inside `vendor-macshell.sh` |

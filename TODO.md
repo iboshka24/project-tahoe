@@ -81,12 +81,32 @@ same code that defines the layout and palette. What is missing is the *client*:
       in the 504-package list; `tahoe-base` needed `install -d "$pkgdir/etc"`
       before the `tahoe-release` redirection — commit 52bb15a). The strip
       "No debugging symbols" note on the release Rust binaries is harmless.
-- [ ] Boot the ISO in a VM and verify the session end to end: Hyprland comes
-      up, MacShell renders (Liquid Glass `state: ready` in `qs log`),
-      Spotlight/clipboard/emoji IPC works, MacLock unlocks via PAM,
-      wallpaper survives a reboot, dark/light pair applies. First step:
-      download `tahoe-live` from the newest green run of
-      `.github/workflows/build-iso.yml` and checksum it.
+- [x] Downloaded and checksummed the artifact (2026-10-19): the ZIP's own
+      CRC and the ISO's built-in `airootfs.sha512` both verify; the ISO is
+      `0037ca5e…27d278`, 1 739 030 528 bytes.
+- [x] Booted it in QEMU (`tests/vm-boot.sh`, no root, KVM). **It did not
+      boot**: `img_label=` is a parameter of the loop-mount hook, not of the
+      hook that finds the medium, so the initramfs never found its own CD and
+      dropped to an emergency shell. Fixed; a second defect (the first-boot
+      prompt holding the desktop) also fixed; a third (`hyprland.lua:100`
+      aborting the config) fixed. Evidence: `docs/iso-boot.md`.
+- [x] The desktop really does come up: Hyprland starts and MacShell renders
+      its menu bar, clock, workspace pills and Dock.
+- [ ] **Rebuild the ISO and boot it through the real bootloader.** The fixes
+      were verified by booting the shipped kernel and initramfs with a
+      corrected command line, which is everything except the two bootloader
+      config files. Until CI rebuilds, no ISO in existence has the fixes.
+- [ ] UEFI boot: the El Torito catalog has an EFI section, but no OVMF was
+      available to boot it, so that path is fixed by inspection only.
+- [ ] `systemd-binfmt.service` **fails** on the live image. For a distro whose
+      headline is kernel-side format dispatch, that needs explaining.
+- [ ] Verify the rest of the session: does the wallpaper reach the screen
+      (hyprpaper is started above line 100 and did launch, but the background
+      is indistinguishable from a plain dark fill), clipboard/emoji IPC,
+      MacLock unlocking via PAM, dark/light pair.
+- [ ] Publish a **GitHub Release**. The ISO is a CI artifact with
+      `retention-days: 1`; there is no release, so `v0.1.0` currently points
+      at nothing downloadable. One day after each build the image is gone.
 - [ ] `binfmt.d/` rules installed by the package (rootless namespaced setup is
       in `tests/dispatch-e2e.sh`).
 - [ ] COSMIC theme: regenerate after every design change — `cargo run -p
