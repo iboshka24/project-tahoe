@@ -77,6 +77,13 @@ means a binary cannot simply be installed — one of these has to happen:
 3. ~~Go without, ship `archinstall`~~ — it is in `extra`, but it is a text
    menu, not the graphical installer that was asked for.
 
+**What it costs in CI time.** The ISO job grew from about 13 minutes to
+16-19 minutes when the installer was added, and one run took 50 — building
+Calamares from source is the bulk of it, and AUR HEAD moving between runs is
+the likeliest reason the same job is not always the same length. That is the
+price of packaging it ourselves instead of pulling a binary; it is worth
+knowing before wondering why the ISO job is slow.
+
 `iso/build.sh` already handles the "no installer" case: first-party packages
 that fail to build are dropped from a sanitized profile copy, and `calamares`
 now goes through the same path, so **the ISO keeps building with or without
