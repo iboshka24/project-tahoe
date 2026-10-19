@@ -68,6 +68,80 @@ if [[ "${#DEPS[@]}" -gt 0 ]]; then
     pacman -Syu --needed --noconfirm -- "${UNIQUE[@]}" || die "pacman refused the first-party dependencies"
 fi
 
+# ── 1b. the installer: third-party packages we rebuild ourselves ───────────
+#
+# Calamares is not in Arch's repositories — the packages API returns nothing
+# for it and it is absent from the extra/ listing — so a distribution that
+# wants it has to build it, which is exactly what CachyOS does. This is ours.
+#
+# Everything it depends on *is* in extra and is verified there rather than
+# assumed: kcoreaddons 6.31.0, kpmcore 26.08.2, libpwquality 1.4.5,
+# qt6-declarative, qt6-svg, yaml-cpp 0.9.0, plus extra-cmake-modules,
+# libglvnd, ninja, qt6-tools and qt6-translations to build. So this list is
+# one package long; if a dependency ever turns out to be AUR-only too, add it
+# here and it will be built first and installed before its dependent.
+#
+# Every step is fail-soft, like the first-party loop: if the installer cannot
+# be built the ISO is still produced without it, and the reason is printed.
+say "building the installer from the AUR"
+AUR_PKGS=(calamares)
+AUR_FAILED=()
+AUR_MISSING_DEPS=()
+
+for name in "${AUR_PKGS[@]}"; do
+    if [[ " ${AUR_FAILED[*]:-} " == *" $name "* ]]; then
+        warn "$name depends on something that failed; skipping"
+        AUR_FAILED+=("$name")
+        continue
+    fi
+    # dependents must come after their AUR dependencies in AUR_PKGS: the loop
+    # is a single pass, not a solver.
+
+    rm -rf "$REPO_DIR/aur/$name"
+    if ! git clone --depth 1 "https://aur.archlinux.org/${name}.git" "$REPO_DIR/aur/$name"; then
+        warn "could not clone the AUR package $name"
+        AUR_FAILED+=("$name")
+        continue
+    fi
+    chown -R "$BUILD_USER:$BUILD_USER" "$REPO_DIR/aur/$name"
+
+    # depends and makedepends both have to be present before makepkg runs:
+    # makepkg's own dependency step goes through sudo, which cannot prompt on
+    # a headless runner. Version constraints are stripped — pacman resolves
+    # the version, and this tree may legitimately be newer than the floor.
+    while read -r dep; do
+        [[ -z "$dep" ]] && continue
+        [[ " ${AUR_PKGS[*]} " == *" $dep "* ]] && continue
+        if ! pacman -S --needed --noconfirm -- "$dep" >/dev/null 2>&1; then
+            AUR_MISSING_DEPS+=("$name:$dep")
+        fi
+    done < <(
+        (source "$REPO_DIR/aur/$name/PKGBUILD" >/dev/null 2>&1
+         printf '%s\n' "${depends[@]:-}" "${makedepends[@]:-}") \
+        | sed 's/[<>=].*//' | sed '/^$/d' | sort -u
+    )
+
+    if (cd "$REPO_DIR/aur/$name" &&
+            runuser -u "$BUILD_USER" -- makepkg -Csf --noconfirm --noprogressbar &&
+            cp ./*.pkg.tar.* "$REPO_DIR/"); then
+        # Install it, so the next package in the list can link against it.
+        pacman -U --noconfirm "$REPO_DIR/aur/$name"/*.pkg.tar.* >/dev/null ||
+            warn "$name built but did not install; a dependent may fail"
+        echo "built $name at $(git -C "$REPO_DIR/aur/$name" rev-parse HEAD)"
+    else
+        warn "could not build $name; the installer will be missing from the ISO"
+        AUR_FAILED+=("$name")
+    fi
+done
+
+if [[ "${#AUR_MISSING_DEPS[@]}" -gt 0 ]]; then
+    warn "dependencies no repository would provide: ${AUR_MISSING_DEPS[*]}"
+    warn "if any of those is an AUR package too, add it to AUR_PKGS in this script"
+fi
+if [[ "${#AUR_FAILED[@]}" -gt 0 ]]; then
+    warn "installer packages that failed: ${AUR_FAILED[*]}"
+fi
+
 mkdir -p "$REPO_DIR"
 chown -R "$BUILD_USER:$BUILD_USER" "$REPO_DIR"
 
