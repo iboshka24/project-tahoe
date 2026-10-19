@@ -92,10 +92,10 @@ same code that defines the layout and palette. What is missing is the *client*:
       aborting the config) fixed. Evidence: `docs/iso-boot.md`.
 - [x] The desktop really does come up: Hyprland starts and MacShell renders
       its menu bar, clock, workspace pills and Dock.
-- [ ] **Rebuild the ISO and boot it through the real bootloader.** The fixes
-      were verified by booting the shipped kernel and initramfs with a
-      corrected command line, which is everything except the two bootloader
-      config files. Until CI rebuilds, no ISO in existence has the fixes.
+- [x] CI rebuilt the image (run 39229471074) and the result was booted through
+      the real bootloader: `tahoe-2026.10.19-x86_64.iso`,
+      `sha256 791a3819…1749`, no emergency shell, desktop up, config-error
+      banner gone. This is the first ISO that boots.
 - [ ] UEFI boot: the El Torito catalog has an EFI section, but no OVMF was
       available to boot it, so that path is fixed by inspection only.
 - [ ] `systemd-binfmt.service` **fails** on the live image. For a distro whose

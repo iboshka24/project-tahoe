@@ -1,8 +1,8 @@
 # Booting the ISO: what the first boot test found
 
-> Status: **the built ISO did not boot. Three defects, all fixed; two of them
-> confirmed fixed by booting the image again.** The evidence below is from
-> QEMU, not from reading the profile.
+> Status: **the shipped ISO did not boot. Three defects, all fixed, and the
+> rebuilt ISO has since booted through the real bootloader to the desktop.**
+> The evidence below is from QEMU, not from reading the profile.
 >
 > Date: 2026-10-19. Image under test:
 > `tahoe-2026.10.18-x86_64.iso`, 1 739 030 528 bytes,
@@ -148,7 +148,28 @@ is text on a serial line:
 
 ![the live session](iso-boot-session.png)
 
-## 6. Still true after all this
+## 6. The rebuilt ISO, booted through the bootloader
+
+CI rebuilt the image from the fixes (run 39229471074, 12m51s, all 67 profile
+checks green) and it was booted the ordinary way — no `-kernel`, no `-append`,
+just SeaBIOS handing control to the ISO's own syslinux:
+
+| | |
+|---|---|
+| image | `tahoe-2026.10.19-x86_64.iso`, 1 739 030 528 bytes |
+| sha256 | `791a38194ec254bda7c2b533db10390a18e8c482610bbeaf8e9e46bbe8da1749` |
+| differs from the previous build | yes — `0037ca5e…` → `791a38…`, so the config change really is in the image |
+| booted config, from inside the ISO | `APPEND archisobasedir=tahoe archisolabel=TAHOE_202610 systemd.firstboot=no` |
+| result | no emergency shell; Hyprland starts and MacShell draws its menu bar, workspace pills, clock and Dock |
+| error banner | **gone** — the `hyprland.lua:100` abort is fixed, so the window and layer rules below it now apply |
+
+![the rebuilt image, booted through syslinux](iso-boot-session.png)
+
+The same size as the previous build is expected and not a sign that nothing
+changed: the edits are a few bytes inside a 1.6 GiB squashfs, and block
+alignment absorbs them. The checksum is the check that matters.
+
+## 7. Still true after all this
 
 - **`systemd-binfmt.service` fails** on the live image
   (`Failed to start Set Up Additional Binary Formats`). For most distros that
@@ -163,11 +184,6 @@ is text on a serial line:
   the syslinux one, but no UEFI firmware was available to this session
   (`edk2-ovmf` is not installed and the mirror was busy), so the UEFI side is
   fixed by inspection only.
-- **The ISO was never rebuilt with these fixes.** A rebuild needs `archiso`
-  and root; the fixes were verified by booting the shipped kernel and
-  initramfs with a corrected command line, which exercises everything except
-  the two bootloader config files themselves. The next CI run is the first
-  that will boot through the real bootloader.
 - **The artifact expires.** CI uploads the ISO with `retention-days: 1`, and
   there is no GitHub Release, so the image stops being downloadable a day
   after it is built. A tag exists (`v0.1.0`); `gh release view v0.1.0` says
