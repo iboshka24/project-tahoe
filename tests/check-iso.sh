@@ -334,6 +334,13 @@ for tool in rsync squashfs-tools grub efibootmgr dosfstools; do
     check_grep "packages.x86_64 lists $tool" "^$tool$" "$PKG"
 done
 check_grep "build.sh drops calamares when unbuilt" "SKIPPED_PKG.*calamares" iso/build.sh
+# The binfmt rule must name an interpreter that is actually packaged. It named
+# /usr/bin/wine, which the image does not install, and systemd-binfmt failed at
+# every boot with "Failed to add binary format 'DOSWin'".
+check_grep "binfmt runs the dispatcher" '/usr/lib/tahoe/tahoe-dispatch' binfmt.d/wine.conf
+check_not_grep "binfmt does not point at an unpackaged wine" '/usr/bin/wine' binfmt.d/wine.conf
+check_grep "tahoe-uel installs the dispatcher" 'target/release/tahoe-dispatch' packages/tahoe-uel/PKGBUILD
+check_grep "os-release names the distribution" '^NAME="Project Tahoe"' iso/airootfs/etc/os-release
 
 # Every module named in the exec/show sequences should exist as a config, or
 # Calamares silently falls back to module defaults that were never meant for

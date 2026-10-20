@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Without this file the image inherits the `filesystem` package's os-release
+# and calls itself "Arch Linux": that is what the GRUB menu entry, the tty
+# login banner and fastfetch showed on an installed system.
+NAME="Project Tahoe"
+PRETTY_NAME="Project Tahoe 0.2"
+ID=tahoe
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;10;132;255"
+HOME_URL="https://github.com/iboshka24/project-tahoe"
+DOCUMENTATION_URL="https://github.com/iboshka24/project-tahoe/tree/master/docs"
+SUPPORT_URL="https://github.com/iboshka24/project-tahoe/issues"
+BUG_REPORT_URL="https://github.com/iboshka24/project-tahoe/issues"

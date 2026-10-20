@@ -21,5 +21,8 @@ build() {
 package() {
 	cd "project-tahoe"
 	install -Dm755 "target/release/tahoe-uel" "$pkgdir/usr/bin/tahoe-uel"
+	# The binfmt_misc interpreter. Without this file the registration in
+	# /usr/lib/binfmt.d/tahoe-wine.conf cannot be added at boot.
+	install -Dm755 "target/release/tahoe-dispatch" "$pkgdir/usr/lib/tahoe/tahoe-dispatch"
 	install -Dm644 LICENSING.md "$pkgdir/usr/share/doc/$pkgname/LICENSING.md"
 }
