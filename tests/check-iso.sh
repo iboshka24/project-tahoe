@@ -334,6 +334,11 @@ for tool in rsync squashfs-tools grub efibootmgr dosfstools; do
     check_grep "packages.x86_64 lists $tool" "^$tool$" "$PKG"
 done
 check_grep "build.sh drops calamares when unbuilt" "SKIPPED_PKG.*calamares" iso/build.sh
+# A PKGBUILD's source is a GitHub tag, and CI used to package that tag rather
+# than the commit it had just checked out: run 39389036727 shipped v0.1.0,
+# 18 commits behind, with the old binfmt rule. The build must snapshot HEAD.
+check_grep "build.sh packages the checked-out commit" 'archive --format=tar.gz' iso/build.sh
+check_grep "build.sh points PKGBUILDs at that snapshot" 'source=.*tahoe-src.tar.gz' iso/build.sh
 # The binfmt rule must name an interpreter that is actually packaged. It named
 # /usr/bin/wine, which the image does not install, and systemd-binfmt failed at
 # every boot with "Failed to add binary format 'DOSWin'".

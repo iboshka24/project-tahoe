@@ -154,6 +154,21 @@ fi
 mkdir -p "$REPO_DIR"
 chown -R "$BUILD_USER:$BUILD_USER" "$REPO_DIR"
 
+# The PKGBUILDs fetch their source from a GitHub tag, which is right for a
+# release build but wrong for this script: CI has just checked out and tested
+# a specific commit, and a tag can be older. Run 39389036727 built the ISO
+# from v0.1.0, 18 commits behind, and the image shipped the pre-fix binfmt
+# rule that made systemd-binfmt fail at boot. Snapshot the working tree and
+# point each first-party PKGBUILD at that snapshot instead.
+SNAPSHOT="$WORK_DIR/tahoe-src.tar.gz"
+mkdir -p "$WORK_DIR"
+# The CI container runs as root on a workspace owned by the runner user, so
+# git would refuse the repository as "dubious ownership"; scope the exception
+# to this one command rather than changing the container's git config.
+git -c safe.directory='*' archive --format=tar.gz --prefix=project-tahoe/ \
+    -o "$SNAPSHOT" HEAD || die "could not snapshot the checkout"
+chmod 644 "$SNAPSHOT"
+
 SKIPPED_PKG=()
 shopt -s nullglob
 while read -r dir; do
@@ -163,10 +178,13 @@ while read -r dir; do
     if (
         mkdir -p "$REPO_DIR/$name"
         cp -a "$SRC_DIR/." "$REPO_DIR/$name/"
+        # The `::` form names the extracted archive: makepkg unpacks it into
+        # $srcdir/project-tahoe, which is the directory every build() expects.
+        sed -i "s#^source=.*#source=(\"tahoe-src.tar.gz::file://$SNAPSHOT\")#" \
+            "$REPO_DIR/$name/PKGBUILD"
         chown -R "$BUILD_USER:$BUILD_USER" "$REPO_DIR/$name"
         cd "$REPO_DIR/$name"
-        # pkgver comes from a git tag on GitHub; packages that do not have
-        # their tag published yet are skipped with a warning, not fatal.
+        # A package whose build fails is skipped with a warning, not fatal.
         # The && keeps this subshell's exit status truthful: a swallowed
         # cp -v … || true used to make the whole build "succeed".
         runuser -u "$BUILD_USER" -- makepkg -Csf --noconfirm --noprogressbar &&
