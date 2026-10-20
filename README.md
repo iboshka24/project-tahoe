@@ -112,6 +112,20 @@ Full detail in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 First-party code: **`MIT OR Apache-2.0`**.
 
+Copyright © 2026 **[iboshka24](https://github.com/iboshka24) and Project Tahoe
+contributors**. Individual contributors retain their rights. This repository is
+the canonical upstream for this project.
+
+- [License overview](LICENSE) and complete [MIT](LICENSES/MIT.txt) /
+  [Apache-2.0](LICENSES/Apache-2.0.txt) terms.
+- [Attribution and upstream notices](NOTICE).
+- [Name, branding, and unofficial-fork guidelines](TRADEMARKS.md).
+
+Licensed forks and commercial reuse are permitted. Preserve the notices required
+by the license you choose, identify your modifications as required, and do not
+present an unofficial fork as an official release or as work by iboshka24.
+Branding guidelines do not add restrictions to the software licenses.
+
 The interesting question is Darling, which is `GPL-3.0-or-later`. Tahoe keeps
 it out of every first-party binary: compatibility layers are spawned as
 separate processes and talked to over pipes/D-Bus. The full analysis — including

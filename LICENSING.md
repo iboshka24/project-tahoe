@@ -1,11 +1,17 @@
 # LICENSING.md — Project Tahoe
 
 > **Status:** decision record. This file is normative for all first-party code.
-> Last reviewed: 2026-10-13.
+> Attribution and branding references updated: 2026-10-20.
 
 ---
 
 ## 1. First-party license
+
+Copyright © 2026 **iboshka24 and Project Tahoe contributors**. Contributors retain
+copyright in their contributions. The root [LICENSE](LICENSE) provides an entry
+point to the existing license texts; [NOTICE](NOTICE) records project attribution.
+Names and first-party branding are addressed separately in [TRADEMARKS.md](TRADEMARKS.md).
+These documents do not revoke existing grants or change the code's license.
 
 **All code authored inside this repository is licensed `MIT OR Apache-2.0`**,
 unless a file's header says otherwise.

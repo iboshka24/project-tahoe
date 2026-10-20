@@ -1,0 +1,18 @@
+Project Tahoe
+Copyright (c) 2026 iboshka24 and Project Tahoe contributors.
+
+Maintainer and project publisher: iboshka24
+Canonical project repository: https://github.com/iboshka24/project-tahoe
+
+Individual contributors retain copyright in their contributions. Existing
+file-level copyright and license notices continue to apply. These credits
+do not assert authorship of third-party components.
+
+This project incorporates or uses independently authored components, including
+the MacShell live desktop by Rickky (0-ss/MacShell). Their authorship, licenses,
+and notices remain with their respective holders. See LICENSING.md,
+REUSE.toml, iso/macshell-vendor.md, and the vendored component notices.
+
+This NOTICE provides attribution only; it does not modify the software licenses.
+When distributing under Apache-2.0, handle this NOTICE as required by section
+4(d) of that license. Under MIT, preserve its copyright and permission notice.

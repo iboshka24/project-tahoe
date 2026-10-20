@@ -1,0 +1,28 @@
+Project Tahoe — license overview
+
+Copyright (c) 2026 iboshka24 and Project Tahoe contributors.
+Individual contributors retain copyright in their contributions.
+
+Except where a file, directory, or component specifies otherwise, first-party
+Project Tahoe code is licensed under either of the following, at your option:
+
+  * MIT License: LICENSES/MIT.txt
+  * Apache License, Version 2.0: LICENSES/Apache-2.0.txt
+
+The complete texts in those files govern the software. This overview does not
+replace or amend either license and does not add conditions to their grants.
+
+Other scopes retain their existing terms. In particular:
+
+  * packages/**: 0BSD, as specified in REUSE.toml and per-file notices.
+  * iso/**: see REUSE.toml, per-file notices, and upstream component licenses;
+    the general annotation is GPL-3.0-or-later, with explicit exceptions.
+  * Vendored MacShell, third-party code, dependencies, fonts, artwork, and other
+    third-party material: their respective licenses and copyright notices.
+
+Consult LICENSING.md, REUSE.toml, and the relevant file or component notices
+for scope and attribution. Preserve the notices required by the license you use.
+
+Project identity and branding are addressed separately in TRADEMARKS.md.
+No exclusive rights in third-party names, including Apple's macOS Tahoe name,
+are claimed by this project. Legitimate attribution and references are allowed.
