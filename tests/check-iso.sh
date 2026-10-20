@@ -302,6 +302,7 @@ check_grep "unpackfs excludes the live sudoers drop-in" '10-tahoe-live' "$CA/mod
 check_grep "unpackfs excludes the archiso initramfs hook" 'mkinitcpio.conf.d/archiso.conf' "$CA/modules/unpackfs.conf"
 check_grep "unpackfs excludes the live getty autologin" 'getty@tty1.service.d/autologin.conf' "$CA/modules/unpackfs.conf"
 check_grep "the cleanup job runs after unpackfs" '^[[:space:]]*- shellprocess$' "$CA/settings.conf"
+check_grep "the cleanup puts the kernel back in /boot" '/boot/vmlinuz-linux' "$CA/modules/shellprocess.conf"
 check_grep "the cleanup locks root" 'passwd -l root' "$CA/modules/shellprocess.conf"
 check_grep "the cleanup removes the live user" 'userdel -r tahoe' "$CA/modules/shellprocess.conf"
 check_grep "root is not given a password page" '^setRootPassword: false' "$CA/modules/users.conf"

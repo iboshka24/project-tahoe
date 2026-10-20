@@ -138,6 +138,11 @@ def main() -> int:
     ap.add_argument("--qemu", default="", help="an explicit qemu command line prefix")
     ap.add_argument("--commands", nargs="*", default=[],
                     help="shell commands to type, one screenshot each")
+    ap.add_argument("--text", nargs="*", default=[],
+                    help="type literal text without pressing Enter, for GUI "
+                         "forms. Braces give keys that are not characters: "
+                         "{tab} {ret} {esc} {bs} {ctrl-a}. Example: "
+                         "--text '{ctrl-a}Ada Lovelace{tab}{ctrl-a}ada'")
     ap.add_argument("--keys", nargs="*", default=[],
                     help="raw QEMU key chords to send, e.g. meta_l-i for Super+I; "
                          "one screenshot after each. Chords are raw because the "
@@ -197,6 +202,29 @@ def main() -> int:
             mon.cmd(f"screendump {args.out}/probe-key-{index:03d}-early.ppm")
             time.sleep(14.0)
             mon.cmd(f"screendump {args.out}/probe-key-{index:03d}.ppm")
+
+        for index, text in enumerate(args.text, start=1):
+            mon.cmd(f"screendump {args.out}/probe-text-{index:03d}-before.ppm")
+            # Braced keys are sent as chords; everything else goes through the
+            # character map, so it is the same keystroke a person would make.
+            tokens = {"{tab}": "tab", "{ret}": "ret", "{esc}": "esc",
+                      "{bs}": "backspace", "{ctrl-a}": "ctrl-a"}
+            position = 0
+            while position < len(text):
+                if text[position] == "{":
+                    end = text.find("}", position)
+                    token = text[position:end + 1] if end > 0 else ""
+                    if token in tokens:
+                        mon.cmd("sendkey " + tokens[token])
+                        position = end + 1
+                        time.sleep(0.15)
+                        continue
+                mon.cmd(f"sendkey {keyname(text[position])}")
+                position += 1
+                time.sleep(0.15)
+            time.sleep(1.0)
+            mon.cmd(f"screendump {args.out}/probe-text-{index:03d}.ppm")
+            print(f"typed: {text}")
 
         for index, command in enumerate(args.commands, start=1):
             mon.cmd(f"screendump {args.out}/probe-{index:03d}-before.ppm")
