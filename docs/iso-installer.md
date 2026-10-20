@@ -1,11 +1,10 @@
 # The installer: Calamares, like CachyOS — and the one thing blocking it
 
-> Status: **the installer opens — its welcome page runs in the live session
-> with the Tahoe branding — but it has never installed anything.** That took
-> five defects found by booting the ISO and reading the guest's own error
-> messages (§7), not by reading documentation. Still missing: the ~20 module
-> configs (only `unpackfs.conf` exists) and any end-to-end install followed by
-> a boot of the installed system. **Do not install to hardware.**
+> Status: **an install now completes and the installed system boots to the
+> desktop from its own disk** (§8). The run that proved it needed two manual
+> repairs, because the ISO it booted predated the package fixes; both repairs
+> are in the repository and a rebuild carries them. Still unproven: the same
+> run without hands, and UEFI. **Do not install to hardware yet.**
 >
 > Date: 2026-10-20.
 
@@ -146,9 +145,78 @@ file fills yet.
 
 ### What is still missing before anyone installs
 
-- The ~20 module configs (welcome, locale, keyboard, partition, users, mount,
-  fstab, bootloader, …). Only `unpackfs.conf` exists, so the modules are
-  running on upstream defaults — which for `partition` and `bootloader` is not
-  a safe thing to leave unstated.
-- A whole install in a VM, then a boot of what it produced.
-- `os-prober`, or an explicit decision to disable other-OS detection.
+- A run of the **rebuilt** ISO that reaches the finished page with no manual
+  step. Everything such a run needs is in the repository; what is missing is
+  the observation, not the configuration.
+- UEFI. Every install so far is BIOS/MBR, because the host has no OVMF.
+- `os-prober`, or an explicit decision to disable other-OS detection (the
+  current decision is that it stays out; `grub-mkconfig` warns once).
+
+## 8. The first whole install: what broke, and the proof it boots
+
+The ISO was booted in QEMU (BIOS, 4 GiB, a 24 GiB qcow2), Calamares was
+started from a terminal, and the wizard was driven **with the keyboard only**:
+`Alt+N` is the `&Next` mnemonic, `Alt+I` is `&Install`, and the users form was
+filled with `Tab` and text. There is no mouse automation here, which is why the
+buttons' mnemonics matter.
+
+The install reached `initcpio` and stopped there:
+
+```
+==> Building image from preset: /etc/mkinitcpio.d/linux.preset: 'default'
+  -> -k /boot/vmlinuz-linux -g /boot/initramfs-linux.img
+==> ERROR: Invalid option -k -- '/boot/vmlinuz-linux' must be readable
+```
+
+`ls -l /boot` in the live session is empty: archiso strips the kernel and
+initramfs from the live root because the live system boots them from the
+medium. `unpackfs` copies that empty `/boot`, so the target had no kernel. The
+package's real file is at `/usr/lib/modules/7.2.11-arch1-1/vmlinuz`; the
+cleanup job now copies it to `/boot/vmlinuz-linux` before `initcpio` runs.
+
+The second run got past `initcpio` and failed at the bootloader:
+
+```
+The bootloader could not be installed. The installation command
+grub-install --target=i386-pc --recheck --force /dev/vda
+returned error code 127.
+```
+
+127 is "not found": the ISO's squashfs was built before `grub` was added to
+`packages.x86_64` (commit `87f2442`), and `unpackfs` copies the squashfs, not
+the live session's overlay. Installing `grub` in the running live system could
+not help — the target is not a copy of the live session.
+
+To get past it **for the purpose of testing the boot chain**, `grub`'s files
+were copied from the live session into the mounted target and `grub-install` +
+`grub-mkconfig` were run in a chroot. That is the manual repair; the rebuilt
+ISO has the package and the module does this itself.
+
+What the installed system then did, and what was checked inside it:
+
+| Check | Result |
+|---|---|
+| GRUB from the MBR | boots, menu entry `Arch Linux` (see the `os-release` defect below) |
+| kernel / initramfs | `7.2.11-arch1-1` booted; `/boot/initramfs-linux.img` was built by `initcpio` |
+| root filesystem | `fstab` mounts `UUID=e9493d86-… / ext4 defaults 0 1` |
+| login | `tahoe-vm login:` — no autologin, so the live getty drop-in is gone |
+| user | `uid=1000(tahoe)`, groups include `wheel`, `sudo` asks for the password |
+| root | `/etc/shadow` is `0600`; the cleanup ran `passwd -l root` |
+| live sudoers | absent; `/etc/sudoers.d/10-installer` is `%wheel ALL=(ALL) ALL`, not NOPASSWD |
+| archiso initramfs hooks | `/etc/mkinitcpio.conf.d/` is empty |
+| desktop | logging in on tty1 starts Hyprland + MacShell (`Pictures/tahoe/installed-desktop.png`) |
+
+Two more defects were found on that installed system:
+
+| # | Symptom | Cause | Fix |
+|---|---|---|---|
+| 6 | `systemd-binfmt.service` failed: `Failed to add binary format 'DOSWin': No such file or directory` | the rule named `wine` as the interpreter; the image does not install wine, and `tahoe-dispatch` was built but never packaged | rule names `/usr/lib/tahoe/tahoe-dispatch`, and `tahoe-uel` installs it |
+| 7 | GRUB menu, login banner and fastfetch say **Arch Linux** | the image shipped no `os-release`, so `filesystem`'s was used | `iso/airootfs/etc/os-release`: `NAME="Project Tahoe"`, `ID=tahoe`, `ID_LIKE=arch` |
+
+Running a Windows `.exe` in the installed system still needs Wine or Proton to
+be installed: the dispatcher is registered, finds no Wine, and says so. The
+image does not ship Wine; that is a packaging decision, not a defect in the
+registration.
+
+Screenshots: `Pictures/tahoe/installer-welcome.png` (wizard),
+`Pictures/tahoe/installed-desktop.png` (the installed system's desktop).

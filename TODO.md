@@ -123,16 +123,16 @@ for the program itself. `docs/iso-installer.md` has the whole picture.
 
 - [x] Branding in the design system's palette, module sequence, `unpackfs`
       install, launcher, `SUPER + I`, checks in `tests/check-iso.sh`.
-- [ ] **`calamares` is not in Arch's repositories** (verified: 0 results in
-      the packages API, absent from the extra listing; AUR only). It must be
-      built in CI from the AUR, or taken from a binary repository, or dropped
-      in favour of the in-repo `archinstall` (a text menu). `build.sh` already
-      drops it when it is missing, so the ISO builds either way.
-- [ ] Write the 20 module configs (`users`, `bootloader`, `partition`, …);
-      only `unpackfs.conf` exists, so the rest would use upstream defaults
-      written for other distributions.
-- [ ] Do a whole install in a VM and boot the result. **Until that is
-      photographed, do not install to hardware.**
+- [x] **`calamares` is not in Arch's repositories**: built from the AUR in CI,
+      present in the image (run 39265708121).
+- [x] The 22 module configs, the live-state cleanup job, `rsync` /
+      `squashfs-tools` / `grub` / `dosfstools` in the image, the kernel copied
+      back into `/boot`, the binfmt rule and `os-release`.
+- [x] A whole install in a VM, and the installed system booted to the desktop
+      (`docs/iso-installer.md` §8). The run needed two manual repairs because
+      its ISO predated the package fixes.
+- [ ] Run the **rebuilt** ISO end to end with no manual step.
+- [ ] UEFI install (host has no OVMF; the ESP path is untested).
 
 ## 6. Known-narrow, do not lose
 
