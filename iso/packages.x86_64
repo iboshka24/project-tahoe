@@ -65,6 +65,7 @@ pipewire-pulse
 # os-prober is deliberately absent: it makes grub-mkconfig probe other disks,
 # and this installer has no story for keeping another system's boot entries.
 rsync
+squashfs-tools
 grub
 efibootmgr
 dosfstools

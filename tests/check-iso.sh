@@ -296,6 +296,15 @@ else
     bad "sequence names modules calamares does not have:$unknown"
 fi
 check_grep "unpackfs reads the live squashfs" 'airootfs.sfs' "$CA/modules/unpackfs.conf"
+# unpackfs runs `unsquashfs -l` to count files and rsync to copy them; without
+# either one the job fails after the disk has already been formatted.
+check_grep "unpackfs excludes the live sudoers drop-in" '10-tahoe-live' "$CA/modules/unpackfs.conf"
+check_grep "unpackfs excludes the archiso initramfs hook" 'mkinitcpio.conf.d/archiso.conf' "$CA/modules/unpackfs.conf"
+check_grep "unpackfs excludes the live getty autologin" 'getty@tty1.service.d/autologin.conf' "$CA/modules/unpackfs.conf"
+check_grep "the cleanup job runs after unpackfs" '^[[:space:]]*- shellprocess$' "$CA/settings.conf"
+check_grep "the cleanup locks root" 'passwd -l root' "$CA/modules/shellprocess.conf"
+check_grep "the cleanup removes the live user" 'userdel -r tahoe' "$CA/modules/shellprocess.conf"
+check_grep "root is not given a password page" '^setRootPassword: false' "$CA/modules/users.conf"
 check_grep "launcher goes through the wrapper" '^Exec=tahoe-installer$' \
     iso/airootfs/usr/share/applications/tahoe-install.desktop
 check_grep "the live session can reach it"   'tahoe-installer' "$LUA"
@@ -320,7 +329,7 @@ check_grep "profiledef makes the wrapper executable in the image" \
 check_grep "packages.x86_64 lists calamares" '^calamares$' "$PKG"
 # The install path's runtime dependencies, found missing in a running live
 # image rather than in review.
-for tool in rsync grub efibootmgr dosfstools; do
+for tool in rsync squashfs-tools grub efibootmgr dosfstools; do
     check_grep "packages.x86_64 lists $tool" "^$tool$" "$PKG"
 done
 check_grep "build.sh drops calamares when unbuilt" "SKIPPED_PKG.*calamares" iso/build.sh

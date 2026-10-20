@@ -35,7 +35,9 @@ PLAIN = {
     "/": "slash", ";": "semicolon", "'": "apostrophe", "\\": "backslash",
     "[": "bracket_left", "]": "bracket_right", "*": "shift-8", "_": "shift-minus",
     "$": "shift-4", "(": "shift-9", ")": "shift-0", ":": "shift-semicolon",
-    "!": "shift-1", "|": "shift-backslash", "<": "shift-comma", ">": "shift-dot",
+    "!": "shift-1", "|": "shift-backslash", '"': "shift-apostrophe",
+    "^": "shift-6", "#": "shift-3", "~": "shift-grave", "%": "shift-5",
+    "+": "shift-equal", "&": "shift-7", "<": "shift-comma", ">": "shift-dot",
     "\n": "ret", "\t": "tab",
 }
 
@@ -118,10 +120,18 @@ def build_qemu(args: argparse.Namespace, monitor_path: Path) -> list[str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("iso", type=Path)
-    ap.add_argument("out", type=Path)
-    ap.add_argument("--boot-wait", type=float, default=200.0,
-                    help="seconds to let the guest boot before typing")
+    ap.add_argument("iso", type=Path, nargs="?", default=None,
+                    help="the ISO to boot (unused with --attach)")
+    ap.add_argument("out", type=Path, nargs="?", default=None,
+                    help="where frames are written (default: next to the socket)")
+    ap.add_argument("--attach", default="",
+                    help="drive an already running QEMU through this monitor "
+                         "socket instead of starting one. This is what makes "
+                         "step-by-step work possible: the guest boots once and "
+                         "stays up while commands are sent in separate calls.")
+    ap.add_argument("--boot-wait", type=float, default=None,
+                    help="seconds to let the guest boot before typing "
+                         "(200 when starting QEMU, 0 when attaching)")
     ap.add_argument("--machine", default="q35")
     ap.add_argument("--memory", default="4096")
     ap.add_argument("--expose", default="/tmp/opencode")
@@ -140,13 +150,29 @@ def main() -> int:
                     help="attach this file as a virtio disk (created sparse if absent)")
     args = ap.parse_args()
 
-    args.out.mkdir(parents=True, exist_ok=True)
-    monitor_path = args.out / "monitor.sock"
-    monitor_path.unlink(missing_ok=True)
+    attached = bool(args.attach)
+    if attached and args.out is None and args.iso is not None:
+        # With --attach the ISO is irrelevant, so a single positional is the
+        # output directory (`--attach sock /tmp/frames`).
+        args.out, args.iso = args.iso, None
+    if attached:
+        monitor_path = Path(args.attach)
+        if args.out is None:
+            args.out = monitor_path.parent
+        args.out.mkdir(parents=True, exist_ok=True)
+        proc = None
+    else:
+        if args.iso is None or args.out is None:
+            ap.error("iso and out are required unless --attach is used")
+        args.out.mkdir(parents=True, exist_ok=True)
+        monitor_path = args.out / "monitor.sock"
+        monitor_path.unlink(missing_ok=True)
+        qemu = build_qemu(args, monitor_path)
+        print("qemu:", " ".join(qemu[:6]), "...")
+        proc = subprocess.Popen(qemu, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
-    qemu = build_qemu(args, monitor_path)
-    print("qemu:", " ".join(qemu[:6]), "...")
-    proc = subprocess.Popen(qemu, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    if args.boot_wait is None:
+        args.boot_wait = 0.0 if attached else 200.0
 
     try:
         mon = Monitor(monitor_path, timeout=60)
@@ -193,19 +219,24 @@ def main() -> int:
         # reads like "nothing happened".
         time.sleep(args.settle)
         mon.cmd("screendump " + str(args.out / "probe-999-final.ppm"))
-        mon.cmd("quit")
+        if not attached:
+            mon.cmd("quit")
+        else:
+            print("attached: guest left running")
     except Exception as exc:  # noqa: BLE001 - report, do not hide
         print(f"probe failed: {exc}", file=sys.stderr)
-        proc.terminate()
+        if proc is not None:
+            proc.terminate()
         return 1
     finally:
-        try:
-            proc.wait(timeout=20)
-        except subprocess.TimeoutExpired:
-            proc.terminate()
-        err = proc.stderr.read().decode("utf-8", "replace") if proc.stderr else ""
-        if err.strip():
-            print("qemu stderr:", err.strip()[:500], file=sys.stderr)
+        if proc is not None:
+            try:
+                proc.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                proc.terminate()
+            err = proc.stderr.read().decode("utf-8", "replace") if proc.stderr else ""
+            if err.strip():
+                print("qemu stderr:", err.strip()[:500], file=sys.stderr)
 
     frames = sorted(args.out.glob("probe-*.ppm"))
     print(f"\n{len(frames)} frame(s); convert with tests/ppm-to-png.py")
