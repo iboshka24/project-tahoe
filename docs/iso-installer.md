@@ -1,13 +1,13 @@
 # The installer: Calamares, like CachyOS — and the one thing blocking it
 
-> Status: **the installer program is in the ISO; the install itself has never
-> run.** Calamares 3.4.2 builds from the AUR in CI and lands in the image
-> (verified in run 39265708121: `built calamares at …`, then
-> `installing calamares…`, and `calamares-3.4.2-2` in the package list
-> alongside `kpmcore-26.08.2`, `polkit-qt6` and `qt6-declarative`). What is
-> still missing is the 20 module configs and any end-to-end install.
+> Status: **the installer opens — its welcome page runs in the live session
+> with the Tahoe branding — but it has never installed anything.** That took
+> five defects found by booting the ISO and reading the guest's own error
+> messages (§7), not by reading documentation. Still missing: the ~20 module
+> configs (only `unpackfs.conf` exists) and any end-to-end install followed by
+> a boot of the installed system. **Do not install to hardware.**
 >
-> Date: 2026-10-19.
+> Date: 2026-10-20.
 
 ---
 
@@ -112,3 +112,43 @@ ISO picks it up.
       `systemd.firstboot=no`, and the installed system will need the opposite
       — a real `machine-id`, a locale, a user password. `unpackfs` copies the
       live configuration, so this must be undone explicitly.
+
+---
+
+## 7. What the guest actually said: five defects, in the order they appeared
+
+Everything below was found by booting the built ISO in QEMU, opening a
+terminal in the live session (`SUPER+Return`) and running the installer by
+hand, then reading the message it printed. The screenshot of the working
+welcome page is `Pictures/tahoe/installer-welcome.png`.
+
+| # | Symptom in the guest | Cause | Fix |
+|---|---|---|---|
+| 1 | `bash: /usr/local/bin/tahoe-installer: Permission denied`<br>`-rw-r--r-- 1 root root` | `mkarchiso` does not carry the checkout's 0755 into the image; it applies `profiledef.sh`'s `file_permissions`. `macshell-start` escapes this only because the session runs it as `sh …`. | the wrapper is declared `0:0:755` in `file_permissions` |
+| 2 | `calamares: Unknown option 'branding'.` | Calamares 3.4.2 has no `--branding`; its command line is `-d, -D, -T, -c/--config, -X` (`src/calamares/main.cpp`). Branding is read from `settings.conf`. | flag removed; `settings.conf` already says `branding: tahoe` |
+| 3 | `qt.qpa.xcb: could not connect to display :0`<br>`Could not load the Qt platform plugin "xcb"` | `DISPLAY` is set, there is no X server, and Qt prefers xcb; it aborts before creating a window. | the wrapper exports `QT_QPA_PLATFORM=wayland` when `WAYLAND_DISPLAY` is set |
+| 4 | `Calamares has invalid settings, shutting down.` | an `instances:` entry with `id:` but no `module:` — `InstanceDescription::fromSettings` reads both, an empty module name makes the descriptor invalid, and `Settings::isValid()` then fails. | the block is gone; a module named in the sequence already reads `modules/<module>.conf` |
+| 5 | `Module "mkinitcpio" not found in module search paths.`<br>`Calamares Initialization Failed` | there is no `mkinitcpio` module in 3.4.2. Arch uses `initcpiocfg` (edit the config) and `initcpio` (run `mkinitcpio`). | `mkinitcpio` → `initcpio` |
+
+Defects 1 and 2 were fixed in the image before the welcome page appeared; 3-5
+were applied to `/etc/calamares/settings.conf` inside the running live
+session, which is why the screenshot shows the page while the ISO that booted
+it still contained the broken sequence. All five are fixed in the repository,
+and checks 86 → 90 cover them: the wrapper is executable in the image, it
+passes no option Calamares lacks, it selects the Wayland backend, and every
+module named in the sequence exists in calamares 3.4.2.
+
+Two warnings remain in the terminal and are not yet dealt with:
+`os-prober cannot start` (the package is not in the live image; the
+`bootloader`/`grubcfg` modules use it to find other systems) and an empty
+black panel in the sidebar, which is an image slot in `branding.desc` that no
+file fills yet.
+
+### What is still missing before anyone installs
+
+- The ~20 module configs (welcome, locale, keyboard, partition, users, mount,
+  fstab, bootloader, …). Only `unpackfs.conf` exists, so the modules are
+  running on upstream defaults — which for `partition` and `bootloader` is not
+  a safe thing to leave unstated.
+- A whole install in a VM, then a boot of what it produced.
+- `os-prober`, or an explicit decision to disable other-OS detection.

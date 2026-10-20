@@ -267,6 +267,34 @@ CA=iso/airootfs/etc/calamares
 check_grep "branding names the product"      '^    productName:.*Project Tahoe' "$CA/branding/tahoe/branding.desc"
 check_grep "branding uses the accent token"  '#0A84FF' "$CA/branding/tahoe/stylesheet.qss"
 check_grep "settings.conf selects the branding" '^branding: tahoe' "$CA/settings.conf"
+
+# Every module in the sequence has to exist, or Calamares refuses to start:
+#   ERROR: Module "mkinitcpio" not found in module search paths.
+# and shows "Calamares Initialization Failed" instead of the installer.
+# This list is the module directory of the calamares-3.4.2 tarball, which is
+# the version iso/build.sh builds; a module renamed upstream fails here.
+known_modules="bootloader contextualprocess displaymanager dracut dracutlukscfg
+dummycpp dummyprocess dummypython finished finishedq fsresizer fstab grubcfg
+hostinfo hwclock initcpio initcpiocfg initramfs initramfscfg interactiveterminal
+keyboard keyboardq license locale localecfg localeq luksbootkeyfile
+luksopenswaphookcfg machineid mkinitfs mount netinstall networkcfg notesqml oemid
+openrcdmcryptcfg packagechooser packagechooserq packages partition plasmalnf
+plymouthcfg preservefiles rawfs removeuser services-openrc services-systemd
+shellprocess summary summaryq tracking umount unpackfs unpackfsc users usersq
+welcome welcomeq zfs zfshostid"
+unknown=""
+while read -r module; do
+    [[ -z "$module" ]] && continue
+    if ! grep -qw -- "$module" <<<"$known_modules"; then
+        unknown="$unknown $module"
+    fi
+done < <(sed -n '/^sequence:/,/^branding:/p' "$CA/settings.conf" \
+         | sed -n 's/^[[:space:]]*-[[:space:]]*\([a-z][a-z0-9-]*\)$/\1/p')
+if [[ -z "$unknown" ]]; then
+    ok "every module in the sequence exists in calamares 3.4.2"
+else
+    bad "sequence names modules calamares does not have:$unknown"
+fi
 check_grep "unpackfs reads the live squashfs" 'airootfs.sfs' "$CA/modules/unpackfs.conf"
 check_grep "launcher goes through the wrapper" '^Exec=tahoe-installer$' \
     iso/airootfs/usr/share/applications/tahoe-install.desktop
@@ -280,6 +308,10 @@ check_grep "wrapper keeps the display env"   'preserve-env=' iso/airootfs/usr/lo
 # option makes it print a message and exit, which from the desktop looks like
 # a launcher that does nothing.
 check_not_grep "wrapper passes no option calamares lacks" '^exec .*--branding' \
+    iso/airootfs/usr/local/bin/tahoe-installer
+# Without this Qt takes the xcb backend because DISPLAY is set, finds no X
+# server, and aborts before any window exists.
+check_grep "wrapper selects the Wayland Qt backend" 'QT_QPA_PLATFORM=wayland' \
     iso/airootfs/usr/local/bin/tahoe-installer
 # mkarchiso does not preserve modes from the checkout, so 0755 in git is 0644
 # in the image unless file_permissions says otherwise.

@@ -20,6 +20,16 @@
 set -eu
 
 PRESERVE="WAYLAND_DISPLAY,DISPLAY,XDG_RUNTIME_DIR,QT_QPA_PLATFORM,XDG_SESSION_TYPE"
+
+# Qt picks the X11 backend whenever DISPLAY is set, and this image has no X
+# server at all, so the process aborts before drawing a window:
+#   qt.qpa.xcb: could not connect to display :0
+#   This application failed to start because no Qt platform plugin could be
+#   initialized.
+# The session is Wayland-only, so name that backend unless the caller did.
+if [ -z "${QT_QPA_PLATFORM:-}" ] && [ -n "${WAYLAND_DISPLAY:-}" ]; then
+    export QT_QPA_PLATFORM=wayland
+fi
 # No --branding here: Calamares 3.4.2 has no such option (its command line is
 # -d, -D, -T, -c/--config, -X — see src/calamares/main.cpp). Passing it makes
 # calamares print "Unknown option 'branding'" and exit without a window. The
