@@ -55,6 +55,20 @@ pipewire
 wireplumber
 pipewire-pulse
 
+# ── what the installer needs at run time ────────────────────────────
+# The install copies the live root with rsync (unpackfs), writes a GRUB boot
+# loader, and formats an EFI system partition. None of these are dependencies
+# of calamares, so without them the wizard starts and then fails at the first
+# real step — which is what happened when the list was checked against a
+# running live image:
+#   pacman -Q rsync grub efibootmgr dosfstools  ->  all four "not found"
+# os-prober is deliberately absent: it makes grub-mkconfig probe other disks,
+# and this installer has no story for keeping another system's boot entries.
+rsync
+grub
+efibootmgr
+dosfstools
+
 # ── network / bluetooth ─────────────────────────────────────────────
 networkmanager
 bluez

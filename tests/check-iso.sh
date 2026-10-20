@@ -318,6 +318,11 @@ check_grep "wrapper selects the Wayland Qt backend" 'QT_QPA_PLATFORM=wayland' \
 check_grep "profiledef makes the wrapper executable in the image" \
     '/usr/local/bin/tahoe-installer"\]="0:0:755"' iso/profiledef.sh
 check_grep "packages.x86_64 lists calamares" '^calamares$' "$PKG"
+# The install path's runtime dependencies, found missing in a running live
+# image rather than in review.
+for tool in rsync grub efibootmgr dosfstools; do
+    check_grep "packages.x86_64 lists $tool" "^$tool$" "$PKG"
+done
 check_grep "build.sh drops calamares when unbuilt" "SKIPPED_PKG.*calamares" iso/build.sh
 
 # Every module named in the exec/show sequences should exist as a config, or
