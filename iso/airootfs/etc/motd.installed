@@ -1,0 +1,17 @@
+Project Tahoe 0.2 — an Arch-based system with a macOS-styled Wayland desktop.
+
+The desktop starts on tty1 when you log in.
+For a plain shell press Ctrl+Alt+F2, or open a terminal with SUPER+Return.
+
+Keybinds:
+  SUPER+Space   Spotlight            SUPER+Return  terminal (kitty)
+  SUPER+V       clipboard history    SUPER+Q       close window
+  SUPER+period  emoji picker         SUPER+F       float/un-float
+  Alt+Tab       app switcher         SUPER+M       maximize
+  Print         screenshot           SUPER+C       center window
+  Ctrl+Alt+W    wallpaper picker     SUPER+1..5    workspaces
+  SUPER+L       lock screen
+
+`sudo` asks for your password; the root account is locked.
+
+Documentation: https://github.com/iboshka24/project-tahoe/tree/master/docs

@@ -1,7 +1,7 @@
 Project Tahoe — live session (Hyprland + MacShell).
 
 The desktop starts automatically on tty1. For a plain shell press
-Ctrl+Alt+F2 … F6 and log in as `root` (no password on the live image)
+Ctrl+Alt+F2 - F6 and log in as `root` (no password on the live image)
 or as `tahoe`.
 
 Keybinds:
@@ -11,7 +11,7 @@ Keybinds:
   Alt+Tab       app switcher         SUPER+M       maximize
   Print         screenshot           SUPER+C       center window
   Ctrl+Alt+W    wallpaper picker     SUPER+1..5    workspaces
-  SUPER+L       lock screen          SUPER+SHIFT+R reload config
+  SUPER+L       lock screen
 
 `sudo` works without a password while you are on the live image.
 

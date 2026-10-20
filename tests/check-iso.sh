@@ -346,6 +346,17 @@ check_grep "binfmt runs the dispatcher" '/usr/lib/tahoe/tahoe-dispatch' binfmt.d
 check_not_grep "binfmt does not point at an unpackaged wine" '/usr/bin/wine' binfmt.d/wine.conf
 check_grep "tahoe-uel installs the dispatcher" 'target/release/tahoe-dispatch' packages/tahoe-uel/PKGBUILD
 check_grep "os-release names the distribution" '^NAME="Project Tahoe"' iso/airootfs/etc/os-release
+# The live MOTD's claims ("root has no password", "sudo needs no password")
+# are false on the installed system, and the cleanup used to copy it verbatim.
+check_grep "the installed motd names the distribution" '^Project Tahoe 0.2' \
+    iso/airootfs/etc/motd.installed
+check_not_grep "the installed motd has no live-only password claim" \
+    'no password|without a password' iso/airootfs/etc/motd.installed
+check_grep "cleanup installs the post-install motd" \
+    'cp /etc/motd.installed /etc/motd' \
+    iso/airootfs/etc/calamares/modules/shellprocess.conf
+check_not_grep "the motd does not advertise a removed keybind" \
+    'reload config' iso/airootfs/etc/motd
 
 # Every module named in the exec/show sequences should exist as a config, or
 # Calamares silently falls back to module defaults that were never meant for
