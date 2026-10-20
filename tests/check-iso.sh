@@ -38,6 +38,13 @@ check_grep() {
     else bad "$label (pattern '$pattern' not found in $file)"; fi
 }
 
+check_not_grep() {
+    local label="$1" pattern="$2" file="$3"
+    if grep -qE -e "$pattern" "$file" 2>/dev/null; then
+        bad "$label (pattern '$pattern' unexpectedly found in $file)"
+    else ok "$label"; fi
+}
+
 LUA="iso/airootfs/etc/skel/.config/hypr/hyprland.lua"
 PKG="iso/packages.x86_64"
 
@@ -269,6 +276,15 @@ check_grep "the live session can reach it"   'tahoe-installer' "$LUA"
 # launcher rather than a broken wrapper, so the wrapper is checked.
 check_grep "wrapper elevates"                'sudo -n' iso/airootfs/usr/local/bin/tahoe-installer
 check_grep "wrapper keeps the display env"   'preserve-env=' iso/airootfs/usr/local/bin/tahoe-installer
+# Calamares 3.4.2's command line is -d, -D, -T, -c/--config, -X. An unknown
+# option makes it print a message and exit, which from the desktop looks like
+# a launcher that does nothing.
+check_not_grep "wrapper passes no option calamares lacks" '^exec .*--branding' \
+    iso/airootfs/usr/local/bin/tahoe-installer
+# mkarchiso does not preserve modes from the checkout, so 0755 in git is 0644
+# in the image unless file_permissions says otherwise.
+check_grep "profiledef makes the wrapper executable in the image" \
+    '/usr/local/bin/tahoe-installer"\]="0:0:755"' iso/profiledef.sh
 check_grep "packages.x86_64 lists calamares" '^calamares$' "$PKG"
 check_grep "build.sh drops calamares when unbuilt" "SKIPPED_PKG.*calamares" iso/build.sh
 

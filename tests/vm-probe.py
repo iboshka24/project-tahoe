@@ -28,7 +28,10 @@ from pathlib import Path
 
 # Only the characters a shell command needs. Uppercase is a shifted letter.
 PLAIN = {
-    " ": "space", "-": "minus", "=": "equal", ".": "dot", ",": "comma",
+    # QEMU calls the space bar "spc"; "space" is not a key it knows, and the
+    # monitor's rejection was never read, so spaces silently never arrived.
+    " ": "spc",
+    "-": "minus", "=": "equal", ".": "dot", ",": "comma",
     "/": "slash", ";": "semicolon", "'": "apostrophe", "\\": "backslash",
     "[": "bracket_left", "]": "bracket_right", "*": "shift-8", "_": "shift-minus",
     "$": "shift-4", "(": "shift-9", ")": "shift-0", ":": "shift-semicolon",
@@ -66,22 +69,30 @@ class Monitor:
                 time.sleep(0.3)
         raise TimeoutError(f"monitor socket never appeared: {last}")
 
-    def _drain(self) -> str:
+    def _drain(self, deadline: float = 5.0) -> str:
+        """Read until the HMP prompt, or until deadline."""
         out = b""
+        end = time.time() + deadline
         try:
-            while True:
+            while time.time() < end:
+                self.sock.settimeout(max(0.05, end - time.time()))
                 block = self.sock.recv(65536)
                 if not block:
                     break
                 out += block
+                if b"(qemu)" in out:
+                    break
         except (TimeoutError, socket.timeout):
             pass
         return out.decode("utf-8", "replace")
 
-    def cmd(self, line: str) -> str:
+    def cmd(self, line: str, wait: float = 0.05) -> str:
+        # Stopping at the prompt matters: this used to sit out the full 5 s
+        # socket timeout on every single command, which made typing one shell
+        # line take minutes and made a probe run look hung.
         self.sock.sendall(line.encode() + b"\n")
-        time.sleep(0.4)
-        return self._drain()
+        time.sleep(wait)
+        return self._drain(deadline=2.0)
 
 
 def build_qemu(args: argparse.Namespace, monitor_path: Path) -> list[str]:
@@ -122,6 +133,9 @@ def main() -> int:
                          "one screenshot after each. Chords are raw because the "
                          "keyboard map below only covers characters a shell command "
                          "needs, and a modifier combination is not a character.")
+    ap.add_argument("--settle", type=float, default=3.0,
+                    help="seconds to wait before the final frame, for commands "
+                         "that start a window")
     ap.add_argument("--disk", default="",
                     help="attach this file as a virtio disk (created sparse if absent)")
     args = ap.parse_args()
@@ -149,7 +163,13 @@ def main() -> int:
             mon.cmd(f"screendump {args.out}/probe-key-{index:03d}-before.ppm")
             mon.cmd(f"sendkey {chord}")
             print(f"sent chord: {chord}")
-            time.sleep(6.0)
+            # Two frames, because the interesting answer arrives late: a chord
+            # that starts a Qt application shows nothing at 6 s and the window
+            # at 20 s, and only the second frame distinguishes "the launcher is
+            # broken" from "the launcher is slow".
+            time.sleep(8.0)
+            mon.cmd(f"screendump {args.out}/probe-key-{index:03d}-early.ppm")
+            time.sleep(14.0)
             mon.cmd(f"screendump {args.out}/probe-key-{index:03d}.ppm")
 
         for index, command in enumerate(args.commands, start=1):
@@ -158,16 +178,20 @@ def main() -> int:
             # the shell's line editor and the screenshot shows a prompt with a
             # command on it, which reads exactly like a command that ran and
             # printed nothing.
-            # 0.08s, not 0.05: at 0.05 the guest console drops keys. The
-            # symptom is a command that arrives with its spaces missing
-            # ("echoSTART"), which looks like a shell bug and is not one.
+            # 0.15s, not 0.05: at 0.05 the guest console genuinely drops
+            # keys. Spaces used to vanish at any speed because they were sent
+            # as "space" instead of "spc" — see the table above.
             for ch in command + "\n":
                 mon.cmd(f"sendkey {keyname(ch)}")
-                time.sleep(0.08)
+                time.sleep(0.15)
             time.sleep(1.5)
             mon.cmd(f"screendump {args.out}/probe-{index:03d}.ppm")
             print(f"sent: {command}")
 
+        # The last command may start a GUI application, which needs seconds to
+        # map a window; a frame taken straight after Enter shows the desktop and
+        # reads like "nothing happened".
+        time.sleep(args.settle)
         mon.cmd("screendump " + str(args.out / "probe-999-final.ppm"))
         mon.cmd("quit")
     except Exception as exc:  # noqa: BLE001 - report, do not hide

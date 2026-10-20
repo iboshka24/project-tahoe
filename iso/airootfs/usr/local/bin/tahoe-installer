@@ -20,4 +20,9 @@
 set -eu
 
 PRESERVE="WAYLAND_DISPLAY,DISPLAY,XDG_RUNTIME_DIR,QT_QPA_PLATFORM,XDG_SESSION_TYPE"
-exec sudo -n --preserve-env="$PRESERVE" calamares --branding=tahoe "$@"
+# No --branding here: Calamares 3.4.2 has no such option (its command line is
+# -d, -D, -T, -c/--config, -X — see src/calamares/main.cpp). Passing it makes
+# calamares print "Unknown option 'branding'" and exit without a window. The
+# branding is chosen in settings.conf (`branding: tahoe`), which is the only
+# place it is read.
+exec sudo -n --preserve-env="$PRESERVE" calamares "$@"

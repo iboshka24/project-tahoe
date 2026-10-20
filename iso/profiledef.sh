@@ -20,4 +20,8 @@ file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/etc/sudoers.d/10-tahoe-live"]="0:0:440"
   ["/root"]="0:0:750"
+  # mkarchiso copies airootfs without preserving modes, so a script that ships
+  # as 0755 in the repository is 0644 in the image unless it is listed here.
+  # macshell-start escaped this only because the session runs it as `sh ...`.
+  ["/usr/local/bin/tahoe-installer"]="0:0:755"
 )
