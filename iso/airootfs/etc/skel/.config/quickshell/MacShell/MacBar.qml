@@ -3500,7 +3500,7 @@ Scope {
         '  if hyprctl hyprpaper wallpaper ",$p" >/dev/null 2>&1 || { hyprctl hyprpaper preload "$p" >/dev/null 2>&1; hyprctl hyprpaper wallpaper ",$p" >/dev/null 2>&1; }; then echo "applied with: hyprpaper"; exit 0; fi',
         'fi',
         'if pgrep -f noctalia-shell >/dev/null 2>&1 && qs -c noctalia-shell ipc call wallpaper set "$p" "" >/dev/null 2>&1; then echo "applied with: noctalia-shell (qs ipc)"; exit 0; fi',
-        'if pgrep -x swaybg >/dev/null 2>&1; then pkill -x swaybg; setsid swaybg -i "$p" -m fill >/dev/null 2>&1 & echo "applied with: swaybg"; exit 0; fi',
+        'if pgrep -x swaybg >/dev/null 2>&1; then pkill -x swaybg; WLR_RENDERER=pixman setsid swaybg -i "$p" -m fill >/dev/null 2>&1 & echo "applied with: swaybg"; exit 0; fi',
         'echo "no wallpaper daemon accepted the image (tried awww, swww, noctalia, hyprpaper, noctalia-shell, swaybg)" >&2',
         'notify-send "Wallpaper" "Could not set it: install awww (and start awww-daemon), or set wallpaperCmd in settings.json." 2>/dev/null',
         'exit 1'

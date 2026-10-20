@@ -96,6 +96,40 @@ class Monitor:
         time.sleep(wait)
         return self._drain(deadline=2.0)
 
+    def sendkey(self, chord: str) -> None:
+        """Send a key chord, and fail loudly when QEMU does not know it.
+
+        HMP answers an unknown key name with "invalid parameter: alt_l" and
+        keeps the prompt. The old code never read that: a whole run of
+        `--keys alt_l-n` typed nothing, every screenshot looked unchanged, and
+        the guest was blamed for ignoring Alt+N. QEMU spells left Alt `alt`,
+        not `alt_l` — the name someone would guess from `meta_l`."""
+        out = self.cmd("sendkey " + chord)
+        for bad in ("invalid parameter", "unknown key"):
+            if bad in out:
+                raise ValueError(
+                    f"qemu rejected sendkey {chord!r}: "
+                    f"{out.strip().splitlines()[-1]}")
+
+
+def send_text(mon: Monitor, text: str) -> None:
+    """Type text one keystroke at a time, with the braced-key shortcuts."""
+    tokens = {"{tab}": "tab", "{ret}": "ret", "{esc}": "esc",
+              "{bs}": "backspace", "{ctrl-a}": "ctrl-a"}
+    position = 0
+    while position < len(text):
+        if text[position] == "{":
+            end = text.find("}", position)
+            token = text[position:end + 1] if end > 0 else ""
+            if token in tokens:
+                mon.sendkey(tokens[token])
+                position = end + 1
+                time.sleep(0.15)
+                continue
+        mon.sendkey(keyname(text[position]))
+        position += 1
+        time.sleep(0.15)
+
 
 def build_qemu(args: argparse.Namespace, monitor_path: Path) -> list[str]:
     qemu: list[str] = []
@@ -144,10 +178,12 @@ def main() -> int:
                          "{tab} {ret} {esc} {bs} {ctrl-a}. Example: "
                          "--text '{ctrl-a}Ada Lovelace{tab}{ctrl-a}ada'")
     ap.add_argument("--keys", nargs="*", default=[],
-                    help="raw QEMU key chords to send, e.g. meta_l-i for Super+I; "
-                         "one screenshot after each. Chords are raw because the "
-                         "keyboard map below only covers characters a shell command "
-                         "needs, and a modifier combination is not a character.")
+                    help="raw QEMU key chords to send, e.g. meta_l-i for Super+I "
+                         "or alt-n for Alt+N; one screenshot after each. QEMU "
+                         "names the left Alt 'alt' (there is no alt_l) and the "
+                         "left Meta 'meta_l'. Chords are raw because the keyboard "
+                         "map below only covers characters a shell command needs, "
+                         "and a modifier combination is not a character.")
     ap.add_argument("--settle", type=float, default=3.0,
                     help="seconds to wait before the final frame, for commands "
                          "that start a window")
@@ -192,7 +228,7 @@ def main() -> int:
         # installer without a terminal to type in.
         for index, chord in enumerate(args.keys, start=1):
             mon.cmd(f"screendump {args.out}/probe-key-{index:03d}-before.ppm")
-            mon.cmd(f"sendkey {chord}")
+            mon.sendkey(chord)
             print(f"sent chord: {chord}")
             # Two frames, because the interesting answer arrives late: a chord
             # that starts a Qt application shows nothing at 6 s and the window
@@ -207,21 +243,7 @@ def main() -> int:
             mon.cmd(f"screendump {args.out}/probe-text-{index:03d}-before.ppm")
             # Braced keys are sent as chords; everything else goes through the
             # character map, so it is the same keystroke a person would make.
-            tokens = {"{tab}": "tab", "{ret}": "ret", "{esc}": "esc",
-                      "{bs}": "backspace", "{ctrl-a}": "ctrl-a"}
-            position = 0
-            while position < len(text):
-                if text[position] == "{":
-                    end = text.find("}", position)
-                    token = text[position:end + 1] if end > 0 else ""
-                    if token in tokens:
-                        mon.cmd("sendkey " + tokens[token])
-                        position = end + 1
-                        time.sleep(0.15)
-                        continue
-                mon.cmd(f"sendkey {keyname(text[position])}")
-                position += 1
-                time.sleep(0.15)
+            send_text(mon, text)
             time.sleep(1.0)
             mon.cmd(f"screendump {args.out}/probe-text-{index:03d}.ppm")
             print(f"typed: {text}")
@@ -236,7 +258,7 @@ def main() -> int:
             # keys. Spaces used to vanish at any speed because they were sent
             # as "space" instead of "spc" — see the table above.
             for ch in command + "\n":
-                mon.cmd(f"sendkey {keyname(ch)}")
+                mon.sendkey(keyname(ch))
                 time.sleep(0.15)
             time.sleep(1.5)
             mon.cmd(f"screendump {args.out}/probe-{index:03d}.ppm")

@@ -35,7 +35,7 @@ hl.config({
         touchpad = { natural_scroll = true },
     },
     misc = {
-        -- we ship our own wallpaper through hyprpaper, not Hyprland's own
+        -- we ship our own wallpaper through swaybg, not Hyprland's own
         force_default_wallpaper = 0,
         disable_hyprland_logo = true,
         -- lets a restarted MacLock take over a lock if it ever died
@@ -46,9 +46,14 @@ hl.config({
 
 -- ── autostart ─────────────────────────────────────────────────────────────
 hl.on("hyprland.start", function()
-    -- wallpaper daemon; MacShell's picker falls back to it (awww > swww >
-    -- hyprpaper > swaybg). The default image is shipped in ~/Pictures.
-    hl.exec_cmd("hyprpaper")
+    -- Wallpaper: swaybg on the pixman renderer. hyprpaper 0.8.x renders
+    -- through hyprtoolkit/Aquamarine, which needs a working GBM/EGL device;
+    -- on a VM whose virtio-gpu has no 3D it aborts with "Failed to acquire a
+    -- buffer" and segfaults. pixman is pure software, and a static picture
+    -- costs nothing after the first paint. "-m fill" also covers 16:10
+    -- outputs, where a 16:9 picture used to leave a black strip.
+    -- MacShell's picker recognises a running swaybg (see MacBar.qml).
+    hl.exec_cmd("env WLR_RENDERER=pixman swaybg -i /home/tahoe/Pictures/Wallpapers/Tahoe-Dark.png -m fill")
     -- MacShell: waits for the compositor, never starts twice, restarts the
     -- shell if it crashes.
     hl.exec_cmd("sh ~/.local/bin/macshell-start")

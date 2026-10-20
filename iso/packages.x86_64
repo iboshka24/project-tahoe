@@ -45,8 +45,8 @@ polkit
 # ── the desktop: Hyprland + MacShell ────────────────────────────────
 hyprland
 hyprlock
-hyprpaper
 quickshell
+swaybg
 qt6-shadertools
 qt6-svg
 

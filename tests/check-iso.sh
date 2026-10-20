@@ -53,7 +53,6 @@ printf '\033[1m== ISO profile: files exist ==\033[0m\n'
 
 for f in \
     "$LUA" \
-    iso/airootfs/etc/skel/.config/hypr/hyprpaper.conf \
     iso/airootfs/etc/skel/.config/macshell/env \
     iso/airootfs/etc/skel/.config/macdock/settings.json \
     iso/airootfs/etc/skel/.bash_profile \
@@ -96,7 +95,10 @@ check_grep "MacShell autostart present"             'macshell-start' "$LUA"
 check_grep "the MacShell markers survived"          '>>> MacShell' "$LUA"
 check_grep "Liquid Glass blur requested"            'name = "macdock".*blur = true' "$LUA"
 check_grep "session-lock restore for MacLock"       'allow_session_lock_restore' "$LUA"
-check_grep "wallpaper is served by hyprpaper"       '^preload=' "iso/airootfs/etc/skel/.config/hypr/hyprpaper.conf"
+check_grep "wallpaper is served by swaybg"          'env WLR_RENDERER=pixman swaybg -i /home/tahoe/Pictures/Wallpapers/Tahoe-Dark.png -m fill' "$LUA"
+check_not_grep "hyprpaper is not autostarted"        'exec_cmd\("hyprpaper"\)' "$LUA"
+check_grep "the wallpaper picker keeps pixman"       'WLR_RENDERER=pixman setsid swaybg' \
+    iso/airootfs/etc/skel/.config/quickshell/MacShell/MacBar.qml
 
 # the vendored start script must be the upstream one by name and shape
 check_grep "macshell-start waits for the socket"    'WAYLAND_DISPLAY' iso/airootfs/etc/skel/.local/bin/macshell-start
@@ -158,7 +160,7 @@ done
 # ---------------------------------------------------------------------------
 printf '\033[1m== Package list ==\033[0m\n'
 
-for p in hyprland quickshell qt6-shadertools qt6-svg hyprlock hyprpaper \
+for p in hyprland quickshell qt6-shadertools qt6-svg hyprlock swaybg \
          pipewire wireplumber networkmanager kitty papirus-icon-theme; do
     check_grep "packages list has $p" "^$p$" "$PKG"
 done
@@ -209,7 +211,6 @@ for f in \
     "$LUA" \
     iso/airootfs/etc/skel/.bash_profile \
     iso/airootfs/etc/skel/.config/macshell/env \
-    iso/airootfs/etc/skel/.config/hypr/hyprpaper.conf \
     iso/airootfs/etc/skel/.local/bin/macshell-start \
     iso/airootfs/usr/local/bin/tahoe-installer \
     iso/airootfs/etc/passwd \
