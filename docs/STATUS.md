@@ -16,15 +16,16 @@
 
 | Что | Состояние |
 |---|---|
-| ISO | собран в CI из `b95bb0f` (run 39511318414), артефакт 1 766 490 280 B, ISO SHA-256 `0e600270…67ed6`; хранится как артефакт с retention 1 день, GitHub Release нет |
-| Live | BIOS/MBR в QEMU; Hyprland + MacShell, обои на весь экран (`swaybg` + pixman) |
+| ISO | собран в CI из `ecd7899` (run 39613914918), артефакт 1 773 945 000 B, ISO `tahoe-2026.10.21-x86_64.iso`, SHA-256 `cba9481d…4425`; хранится как артефакт с retention 1 день, GitHub Release нет |
+| Live | BIOS/MBR в QEMU; Hyprland + MacShell 0.2.8, фото-обои на весь экран (`swaybg` + pixman), 4 виджета (погода работает через `-nic user`) |
 | Установка | Calamares 3.4.2: чистая установка на новый 24 GiB qcow2, **без ручных правок**, экран «All done» |
 | Установленная система | грузится с диска сама до `tahoe-vm login:`; вход `tahoe`/`tahoe123` → рабочий стол; `systemctl --failed` → 0 |
-| Проверки | uid 1000, группа `wheel`; root `L`; `sudo -n` требует пароль; автологина нет; fstab UUID/ext4; `/boot` с ядром и initramfs; `ID=tahoe`; binfmt `active`; live-MOTD не протёк |
+| Конфиг в системе | `~/.config/macshell/vendor` = 0.2.8 (`eebaaad`); 4 виджета в `macwidgets/settings.json`; обои побайтово равны `etc/skel` |
+| Проверки | uid 1000, группа `wheel`; root `L`; `sudo -n` требует пароль; автологина нет; fstab UUID/ext4; `/boot` с ядром и initramfs; `ID=tahoe`; binfmt `active`, в `binfmt_misc` — `tahoe-wine-pe`; live-MOTD не протёк |
 | Обои | `hyprpaper 0.8.4` падал без GPU; заменён на `swaybg`; чёрная полоса на 16:10 исчезла |
-| Открыто | UEFI не проверен; Wine не в образе; Release нет; `/etc/calamares` остаётся на цели (косметика) |
+| Открыто | UEFI не проверен; Wine не в образе; Release нет; `/etc/calamares` остаётся на цели (косметика); sync-базы `pacman` на цели пусты — нужен `pacman -Sy` |
 
-Подробности: [`iso-installer.md`](iso-installer.md) §9,
+Подробности: [`iso-installer.md`](iso-installer.md) §9–§10,
 [`iso-session.md`](iso-session.md) §2a, [`limitations.md`](limitations.md).
 
 ---

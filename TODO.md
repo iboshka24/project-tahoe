@@ -136,8 +136,15 @@ for the program itself. `docs/iso-installer.md` has the whole picture.
 - [x] Run the **rebuilt** ISO end to end with no manual step: run 39511318414,
       clean install on a fresh 24 GiB qcow2, `All done`, disk booted alone,
       `systemctl --failed` empty (`docs/iso-installer.md` §9).
+- [x] Repeat it on the MacShell 0.2.8 / Yosemite image: run 39613914918,
+      installed `~/.config/macshell/vendor` = 0.2.8, the four widgets and the
+      photo wallpaper byte-identical to the profile's `etc/skel`, binfmt rule
+      registered (`docs/iso-installer.md` §10).
 - [ ] Remove `/etc/calamares` (`branding/`, `modules/`, `settings.conf`) from
       the target in the cleanup job; it is inert but should not be there.
+- [ ] Decide whether the installed system should ship populated `pacman` sync
+      databases (today `pacman -Sy` is required before installing anything;
+      `docs/iso-installer.md` §10).
 - [ ] UEFI install (host has no OVMF; the ESP path is untested).
 
 ## 6. Known-narrow, do not lose

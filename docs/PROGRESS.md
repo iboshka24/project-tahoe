@@ -4,7 +4,41 @@
 > задачи. Правило: **в Completed попадает только то, что реально
 > проверено командой из раздела Validation.**
 
-Обновлено: 2026-10-21 (сессия 12: финальный ISO, чистая установка, обои).
+Обновлено: 2026-10-21 (сессия 13: MacShell 0.2.8, фото-обои и виджеты — на живом и на установленном).
+
+---
+
+### MacShell 0.2.8 и «как на галерее»: фото-обои + виджеты на обоих системах (сессия 13)
+
+- **ISO из `ecd7899`** (CI run 39613914918, артефакт 12353065779,
+  1 773 945 000 B): `tahoe-2026.10.21-x86_64.iso`, `sha256:cba9481d…4425`.
+  В образе MacShell/MacLock 0.2.8 (upstream `eebaaad`), фото-обои Yosemite
+  (CC0, 1920×1200) и `macwidgets/settings.json` с четырьмя карточками.
+- **Живой образ:** загрузка в QEMU с `-nic user`; обои закрыли весь экран
+  1280×800, виджеты (Clock/Calendar/Weather/Player) отрисовались, погода
+  показала `Yosemite Valley 13 °C` — сетевой путь Open-Meteo работает.
+- **Чистая установка:** только клавиатура (`SUPER+I`, 4×`Alt+N`, форма,
+  `Alt+N`, `Alt+I`), экран «All done», **ни одной ручной правки**.
+- **Диск загрузился сам** до `tahoe-vm login:` (автологина нет — так
+  задумано); вход `tahoe`/`tahoe123` → Hyprland + MacShell 0.2.8, обои и
+  виджеты на месте. Оттуда сделаны README-скриншоты `tahoe-desktop.png`,
+  `tahoe-spotlight.png`, `tahoe-control-center.png`.
+- **Проверено внутри установленной системы:** `~/.config/macshell/vendor` →
+  `MACSHELL_VERSION=0.2.8`, `MACSHELL_COMMIT=eebaaad…`; `jq -c .widgets
+  .config/macwidgets/settings.json` → `clock` large, `calendar` large,
+  `weather` medium, `player` medium; `sha256sum
+  Pictures/Wallpapers/Tahoe-Dark.png` → `50294fbb…5026` (побайтово равно
+  `etc/skel`); `systemctl --failed` → `0 loaded units listed.`;
+  `ls /proc/sys/fs/binfmt_misc` → `tahoe-wine-pe`; `pacman -Q jq curl
+  playerctl qt6-multimedia swaybg` → 1.8.2-1 / 8.23.0-1 / 2.4.1-5 /
+  6.12.0-1 / 1.2.2-1.
+- **Осталось честно открытым:** UEFI (только BIOS/MBR), Wine в образе нет,
+  GitHub Release нет, `/etc/calamares` остаётся на цели (косметика); на цели
+  пусты sync-базы `pacman` — до `pacman -Sy` предупреждение
+  `database file for 'core' does not exist`.
+
+Подробности: `docs/iso-installer.md` §10, `docs/iso-session.md` §2a–2b,
+`docs/limitations.md` §2. Скриншоты — в `docs/images/`.
 
 ---
 

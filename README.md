@@ -18,8 +18,9 @@ tooling and seven working crates exist; their tests pass and the shell renders
 real scenes with real text (see `TODO.md` for what is still ahead). The archiso
 profile builds a bootable ISO that runs [Hyprland with a vendored MacShell
 session](https://github.com/0-ss/MacShell) and installs with Calamares; a clean
-install on the final image (CI run 39511318414) reached the installed desktop
-without manual repairs. The Rust shell is still not a Wayland client — the ISO
+install on the MacShell 0.2.8 image (CI run 39613914918) reached the installed
+desktop without manual repairs, photo wallpaper and widgets included. The Rust
+shell is still not a Wayland client — the ISO
 uses the vendored shell. There is no release download yet; the ISO is a CI
 artifact (see `docs/limitations.md`). See [ROADMAP.md](ROADMAP.md) for what
 comes next.
@@ -69,7 +70,7 @@ actually own.
 | `tahoe-compositor` | ✅ compiles against Smithay 0.7 | `cargo build -p tahoe-compositor` |
 | `tahoe-shell` | ✅ model implemented (dock/workspaces/launcher index) | `cargo test -p tahoe-shell` |
 | `tahoe-diagnostics` | ✅ read-only probes | `cargo test -p tahoe-diagnostics` |
-| `iso/` archiso profile + MacShell live session | ✅ built, boots, installs | CI run 39511318414; clean-install evidence in `docs/iso-installer.md` §9 |
+| `iso/` archiso profile + MacShell live session | ✅ built, boots, installs | CI run 39613914918; clean-install evidence in `docs/iso-installer.md` §9–§10 |
 | `packages/` PKGBUILDs | ✅ built into the ISO | `iso/build.sh` packages `tahoe-base`, `tahoe-compositor` and `tahoe-uel` from the checkout |
 | `binfmt.d/` entries | ✅ active in the installed system; a dev host still needs root + consent | `systemctl status systemd-binfmt` in `docs/iso-installer.md` §9 |
 | Tahoe Shell GUI | 🔴 not started | see ROADMAP |
@@ -105,7 +106,8 @@ are not captures of Tahoe. The installed system ships the same 0.2.8 shell.
 | ![MacShell Dock with Liquid Glass](docs/images/macshell-upstream-dock.png) | ![MacShell Control Center](docs/images/macshell-upstream-control-center.png) |
 
 The full verification record — including the login prompt, the binfmt rule and
-the swaybg process — is in [`docs/iso-installer.md`](docs/iso-installer.md) §9.
+the swaybg process — is in [`docs/iso-installer.md`](docs/iso-installer.md)
+§9–§10.
 
 ---
 

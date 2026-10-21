@@ -46,12 +46,13 @@
 
 | Ограничение | Детали |
 |---|---|
-| Образ из CI | Собран и загружен: `b95bb0f`, run 39511318414, ISO SHA-256 `0e600270…67ed6`. Живёт как артефакт с retention 1 день (см. «Релиза нет»). |
+| Образ из CI | Собран и загружен: `ecd7899`, run 39613914918, ISO `tahoe-2026.10.21-x86_64.iso` SHA-256 `cba9481d…4425`. Живёт как артефакт с retention 1 день (см. «Релиза нет»). |
 | UEFI не проверен | В каталоге El Torito есть EFI-секция, но OVMF в этой сессии недоступен; все загрузки и установка — BIOS/MBR. |
 | `systemd-binfmt.service` | Исправлено: правило собиралось из тега `v0.1.0` (на 18 коммитов позади) и указывало на несуществующий `/usr/bin/wine`; сборка `142ad4d` берёт HEAD, и на ISO 2026-10-20 `systemctl --failed` пуст. На установленной системе сервис `active`, правило `:tahoe-wine-pe:M::MZ::/usr/lib/tahoe/tahoe-dispatch:P`. |
-| Обои: hyprpaper 0.8.4 падал | На образе 2026-10-20 рабочий стол был **чёрным**: hyprpaper 0.8.4 (hyprtoolkit/Aquamarine) требует GBM/EGL, в QEMU без 3D падает с `Failed to acquire a buffer` и SIGSEGV. Переведено на `swaybg` + `WLR_RENDERER=pixman`. На ISO `b95bb0f` и на установленной системе обои закрывают весь экран 1280×800, `pgrep -a swaybg` показывает процесс. |
+| Обои: hyprpaper 0.8.4 падал | На образе 2026-10-20 рабочий стол был **чёрным**: hyprpaper 0.8.4 (hyprtoolkit/Aquamarine) требует GBM/EGL, в QEMU без 3D падает с `Failed to acquire a buffer` и SIGSEGV. Переведено на `swaybg` + `WLR_RENDERER=pixman`. На ISO `ecd7899` (фото-обои Yosemite, 1920×1200 CC0) и на установленной системе обои закрывают весь экран 1280×800, `pgrep -a swaybg` показывает процесс. |
+| `pacman` без sync-баз | На установленной системе `pacman -Q` работает от локальной базы, но `core`/`extra` не заполнены: `warning: database file for 'core' does not exist`. Для установки пакетов нужен `pacman -Sy` при первой сети. Ожидаемо для offline-установщика на `unpackfs`; отмечено в `docs/iso-installer.md` §10. |
 | Релиза нет | ISO живёт как артефакт CI с `retention-days: 1`; `gh release view v0.1.0` → `release not found`. |
-| **Установщик: установка проходит, железо — нет** | Calamares 3.4.2 собирается из AUR в CI. На ISO `b95bb0f` чистая установка на новый 24 GiB qcow2 прошла **без ручных правок**; диск загрузился сам до `tahoe-vm login:`, вход → рабочий стол, `systemctl --failed` пуст (`docs/iso-installer.md` §9). UEFI не проверен, хост BIOS/MBR. **Не ставить на железо.** |
+| **Установщик: установка проходит, железо — нет** | Calamares 3.4.2 собирается из AUR в CI. На ISO `ecd7899` чистая установка на новый 24 GiB qcow2 прошла **без ручных правок**; диск загрузился сам до `tahoe-vm login:`, вход → рабочий стол с фото-обоями и виджетами, `systemctl --failed` пуст, `~/.config/macshell/vendor` = 0.2.8 (`docs/iso-installer.md` §9–§10). UEFI не проверен, хост BIOS/MBR. **Не ставить на железо.** |
 | `/etc/calamares` остаётся на цели | `branding/`, `modules/`, `settings.conf` копируются `unpackfs` и не удаляются cleanup-задачей. Автоматически ничего не запускают; косметика, задача в `TODO.md`. |
 
 ## 2a. Universal execution (сессия 2)

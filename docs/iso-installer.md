@@ -1,12 +1,13 @@
 # The installer: Calamares, like CachyOS
 
 > Status: **a clean install completes without manual repairs, and the
-> installed system boots from its own disk to the desktop** (§9). The earlier
-> run in §8 needed two repairs because its ISO predated the package fixes;
-> §9 is the rebuilt image with nothing done by hand. BIOS/MBR only — UEFI is
-> still unproven. **Do not install to hardware yet.**
+> installed system boots from its own disk to the desktop** (§9, repeated on
+> the MacShell 0.2.8 image in §10). §8 needed two repairs because its ISO
+> predated the package fixes; §9 and §10 are rebuilt images with nothing done
+> by hand. BIOS/MBR only — UEFI is still unproven. **Do not install to
+> hardware yet.**
 >
-> Date: 2026-10-20, revised 2026-10-21.
+> Date: 2026-10-20, revised 2026-10-21 (§10).
 
 ---
 
@@ -317,3 +318,84 @@ Screenshots with the terminal output: `installed-final-binfmt-swaybg.png`,
 - **The 16:10 strip is gone.** The earlier installed screenshot had ~80 px of
   black at the bottom with console text; `swaybg -m fill` covers the output,
   and the screenshots above show a clean bottom edge.
+
+## 10. The MacShell 0.2.8 image, installed and checked (2026-10-21)
+
+The desktop changed after §9: commit `ecd7899` re-vendored MacShell at upstream
+`eebaaad` (tag 0.2.8), replaced the gradient wallpaper with a CC0 Yosemite
+photograph and added a first-run widget layout. The question §10 answers is the
+one the README screenshots now ask: does the *installed* system get that same
+desktop, or only the live user?
+
+| Item | Value |
+|---|---|
+| source | `ecd7899` (MacShell 0.2.8, Yosemite wallpaper, widget layout) |
+| CI run | [39613914918](https://github.com/iboshka24/project-tahoe/actions/runs/39613914918), success |
+| artifact | `12353065779`, 1 773 945 000 bytes |
+| ISO | `tahoe-2026.10.21-x86_64.iso`, `sha256:cba9481dfd2be0d90bd35315e7fba803cbe1baec8d75d77e21bb6babc9074425` |
+| disk | fresh 24 GiB qcow2, empty |
+| firmware | BIOS/MBR (no OVMF on the host) |
+
+### The live image
+
+Booted with no arguments beyond `-nic user` (QEMU user networking, so the
+weather card had a route). The desktop came up with the photograph across the
+whole 1280×800 output and all four widget cards drawn — large Clock and
+Calendar on top, medium Weather and Player below. The Weather card is the
+load-bearing check here: it showed `Yosemite Valley 13 °C` fetched from
+Open-Meteo, so the session had working network, not just a styled layout.
+Capture: `vm-live/frame-090.png`.
+
+### The install
+
+The same keyboard-only path as §9: `SUPER+I` opened Calamares, four `Alt+N`
+presses walked Welcome → Location → Keyboard → Partitions → Users, the form was
+filled with `Tahoe User` / `tahoe` / `tahoe-vm` / `tahoe123`, `Alt+N` showed the
+summary (erase `/dev/vda`, one ext4 partition, GRUB on `/dev/vda`) and `Alt+I`
+started it. It ended at `All done.` with no terminal opened and no command run
+in a chroot. Capture: `vm-install/progress-2.png`.
+
+### The installed disk alone
+
+The ISO was detached and the VM restarted from the qcow2 only. It reached
+
+```
+Project Tahoe 0.2 7.2.11-arch1-1 (tty1)
+tahoe-vm login:
+```
+
+on its own — no autologin, as designed. Logging in as `tahoe` / `tahoe123`
+started Hyprland + MacShell with the photograph and all four widgets on screen.
+The captures from that session are the README images: `tahoe-desktop.png`,
+`tahoe-spotlight.png`, `tahoe-control-center.png`.
+
+### What was checked inside the installed system
+
+| Check | Command | Result |
+|---|---|---|
+| vendored shell version | `cat ~/.config/macshell/vendor` | `MACSHELL_VERSION=0.2.8`, `MACSHELL_COMMIT=eebaaad667bc847287dc8baeda93dbec97401fa4`, `MACSHELL_VENDORED=2026-10-21` |
+| widget layout | `jq -c .widgets ~/.config/macwidgets/settings.json` | 4 widgets: `clock` large, `calendar` large, `weather` medium, `player` medium |
+| wallpaper bytes | `sha256sum ~/Pictures/Wallpapers/Tahoe-Dark.png` | `50294fbb…5026`, byte-identical to the profile's `etc/skel` file |
+| failed units | `systemctl --failed` | `0 loaded units listed.` |
+| binfmt rule | `ls /proc/sys/fs/binfmt_misc` | `register status tahoe-wine-pe` |
+| new packages | `pacman -Q jq curl playerctl qt6-multimedia swaybg` | `jq 1.8.2-1`, `curl 8.23.0-1`, `playerctl 2.4.1-5`, `qt6-multimedia 6.12.0-1`, `swaybg 1.2.2-1` |
+| autologin | login prompt instead of a session | live getty drop-in removed, as in §8/§9 |
+
+Screenshots with the terminal output: `vm-install/verify.png`,
+`vm-install/verify2.png`.
+
+### What this does not prove, and two leftovers
+
+- **UEFI is still unverified.** Every install, including this one, is
+  BIOS/MBR.
+- **Wine is still not shipped.** The binfmt rule is registered; running a
+  `.exe` needs Wine or Proton installed first.
+- **The ISO is still a CI artifact** with one-day retention; there is no
+  GitHub Release yet.
+- **`/etc/calamares` still survives on the target** — the same cosmetic
+  leftover as §9, listed in `TODO.md`.
+- **`pacman`'s sync databases are empty on the installed system.** `pacman -Q`
+  works from the local database, but it warns `database file for 'core' does
+  not exist` until the user runs `pacman -Sy` with a network. An offline
+  installer has nothing to sync from; this is worth a line in the
+  documentation, not a defect.
