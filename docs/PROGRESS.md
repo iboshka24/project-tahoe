@@ -4,7 +4,43 @@
 > задачи. Правило: **в Completed попадает только то, что реально
 > проверено командой из раздела Validation.**
 
-Обновлено: 2026-10-14 (сессия 2: Universal Native Execution).
+Обновлено: 2026-10-21 (сессия 12: финальный ISO, чистая установка, обои).
+
+---
+
+### Чистая установка финального ISO — и обои, которые не были чёрными (сессия 12)
+
+- **ISO из `b95bb0f`** (CI run 39511318414, артефакт 12306333736):
+  `sha256:a9b46634…`, сам ISO — `0e600270…67ed6`. В списке 520 пакетов,
+  `swaybg-1.2.2-1` есть, `hyprpaper` нет.
+- **Найдено на живом образе:** рабочий стол был **чёрным**. `hyprpaper 0.8.4`
+  сменил формат конфига (`wallpaper=,path` → блок `monitor`/`path`) — это
+  исправлено, но остался крах: hyprtoolkit/Aquamarine требует GBM/EGL,
+  которого нет у QEMU `virtio-vga` без 3D. `chmod 666 /dev/dri/*` не помог:
+  `DRM_IOCTL_MODE_CREATE_DUMB` требует DRM master, а не прав файла.
+- **Замена:** `swaybg` с `WLR_RENDERER=pixman` — программный рендерер,
+  без DRM/GPU. В той же сессии обои появились и закрыли **весь** экран
+  1280×800; заодно исчезла чёрная полоса с хвостом консоли, которую
+  hyprpaper оставлял на 16:10. Пикер в MacBar.qml теперь тоже перезапускает
+  swaybg с pixman, иначе выбранные обои исчезали бы в этой ВМ.
+- **Чистая установка:** свежий 24 GiB qcow2, Calamares 3.4.2, только
+  клавиатура (`SUPER+I`, 4×`Alt+N`, форма, `Alt+I`). Экран «All done»,
+  **ни одной ручной правки** (в отличие от §8 `iso-installer.md`).
+- **Диск загрузился сам** до `tahoe-vm login:`; вход `tahoe`/`tahoe123` →
+  Hyprland + MacShell с обоями. Внутри: `systemctl --failed` → 0; binfmt
+  `active`, правило `:tahoe-wine-pe:M::MZ::/usr/lib/tahoe/tahoe-dispatch:P`;
+  `id` → uid 1000 + `wheel`; root `L`; `sudo -n` просит пароль; автологина
+  нет; `/dev/vda1 ext4` по UUID; `/boot` с `vmlinuz-linux` и
+  `initramfs-linux.img`; `ID=tahoe`; установленный MOTD, live-фраза
+  «no password» — 0 вхождений.
+- **Осталось честно открытым:** UEFI (только BIOS/MBR), Wine в образе нет,
+  GitHub Release нет, `/etc/calamares` остаётся на цели (косметика).
+
+Скриншоты: `Pictures/tahoe/install-final-all-done.png`,
+`installed-final-login.png`, `installed-final-desktop.png`,
+`installed-final-desktop-clean.png`, `installed-final-binfmt-swaybg.png`,
+`installed-final-system.png`, `installed-final-root-locked.png`.
+Подробности: `docs/iso-installer.md` §9, `docs/iso-session.md` §2a.
 
 ---
 

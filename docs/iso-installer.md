@@ -1,12 +1,12 @@
-# The installer: Calamares, like CachyOS — and the one thing blocking it
+# The installer: Calamares, like CachyOS
 
-> Status: **an install now completes and the installed system boots to the
-> desktop from its own disk** (§8). The run that proved it needed two manual
-> repairs, because the ISO it booted predated the package fixes; both repairs
-> are in the repository and a rebuild carries them. Still unproven: the same
-> run without hands, and UEFI. **Do not install to hardware yet.**
+> Status: **a clean install completes without manual repairs, and the
+> installed system boots from its own disk to the desktop** (§9). The earlier
+> run in §8 needed two repairs because its ISO predated the package fixes;
+> §9 is the rebuilt image with nothing done by hand. BIOS/MBR only — UEFI is
+> still unproven. **Do not install to hardware yet.**
 >
-> Date: 2026-10-20.
+> Date: 2026-10-20, revised 2026-10-21.
 
 ---
 
@@ -220,3 +220,100 @@ registration.
 
 Screenshots: `Pictures/tahoe/installer-welcome.png` (wizard),
 `Pictures/tahoe/installed-desktop.png` (the installed system's desktop).
+
+## 9. The clean run on the definitive image (2026-10-21)
+
+The image from §8 had been built before `grub`, the `/boot` fix, the
+`os-release` file and the rebuilt binfmt rule were in the squashfs, which is
+why it needed two manual repairs. This run starts from an image that contains
+all of them, and the point is that **nothing is repaired by hand**.
+
+| Item | Value |
+|---|---|
+| source | `b95bb0f` (adds the swaybg wallpaper, on top of `f178c0d`) |
+| CI run | [39511318414](https://github.com/iboshka24/project-tahoe/actions/runs/39511318414), success |
+| artifact | `12306333736`, 1 766 490 280 bytes, `sha256:a9b4663439e2cc4418e2df5eb932ef5ba6a15f34052b633389b5b818cc8aa879` |
+| ISO | `tahoe-2026.10.20-x86_64.iso`, `sha256:0e6002705efb62e4c7d03c7d31f7b20138f1e7d916772df3b00c984b3c767ed6` |
+| package list | 520 packages; `swaybg-1.2.2-1` is in, `hyprpaper` is not |
+| disk | fresh 24 GiB qcow2, empty |
+| firmware | BIOS/MBR (no OVMF on the host) |
+
+### The wizard
+
+The live image was booted with the disk attached. The desktop came up with the
+Tahoe wallpaper **across the whole 1280×800 output** — the first confirmation
+that the `swaybg` change reached the built image. `SUPER+I` opened Calamares
+(the window takes focus directly; no `SUPER+Left` needed on a clean session),
+then four `Alt+N` presses walked Welcome → Location → Keyboard → Partitions →
+Users. The Users form was filled with `Tahoe User` / `tahoe` / `tahoe-vm` /
+`tahoe123` (once in each password field); the auto-filled login was replaced
+with `Ctrl+A`. `Alt+N` showed the summary: erase `/dev/vda`, one 24 575 MiB
+ext4 partition flagged `boot`, GRUB on `/dev/vda`. `Alt+I` started the install.
+
+It went `Filling up filesystems` → 10 % … and ended at:
+
+```
+All done.
+Project Tahoe 0.2 has been installed on your computer.
+You may now restart into your new system, or continue using the Project Tahoe Live environment.
+```
+
+No terminal was opened during the install and no command was run in a chroot.
+Screenshot: `Pictures/tahoe/install-final-all-done.png`.
+
+### Booting the disk alone
+
+The ISO was detached and the VM restarted from the qcow2 only. It reached
+
+```
+Project Tahoe 0.2 7.2.11-arch1-1 (tty1)
+tahoe-vm login:
+```
+
+on its own (`installed-final-login.png`). Logging in as `tahoe` / `tahoe123`
+started Hyprland + MacShell; the wallpaper filled the screen and the Dock's
+glass showed it (`installed-final-desktop.png`, `installed-final-desktop-clean.png`).
+
+### What was checked inside the installed system
+
+| Check | Command | Result |
+|---|---|---|
+| user and groups | `id` | `uid=1000(tahoe)`, groups `network, users, video, storage, lp, audio, wheel` |
+| failed units | `systemctl --failed` | `0 loaded units listed.` |
+| binfmt rule | `cat /usr/lib/binfmt.d/tahoe-wine.conf` | `:tahoe-wine-pe:M::MZ::/usr/lib/tahoe/tahoe-dispatch:P` |
+| binfmt service | `systemctl is-active systemd-binfmt` | `active` |
+| wallpaper daemon | `pgrep -a swaybg` | `swaybg -i …/Tahoe-Dark.png -m fill` |
+| old daemon | `pgrep -a hyprpaper` | no process; `~/.config/hypr/` has only `hyprland.lua` |
+| installed MOTD | `head -4 /etc/motd` | “Project Tahoe 0.2 — an Arch-based system…” |
+| live MOTD leak | `grep -c "no password" /etc/motd` | `0` |
+| root account | `sudo passwd -S root` | `root L 2026-10-20 -1 -1 -1` (locked) |
+| sudo | `sudo -n true` | `sudo: a password is required` |
+| autologin | `ls -A /etc/systemd/system/getty@tty1.service.d/` | empty |
+| root filesystem | `findmnt -no SOURCE,FSTYPE /` | `/dev/vda1 ext4` |
+| fstab | `grep UUID /etc/fstab` | `UUID=b01257fa-… / ext4 defaults 0 1` |
+| kernel / initramfs | `ls -l /boot` | `vmlinuz-linux`, `initramfs-linux.img`, `grub/` |
+| identity | `grep -E "^(ID\|NAME)=" /etc/os-release` | `NAME="Project Tahoe"`, `ID=tahoe` |
+| live script | `sudo ls -la /root` | only `.ssh`; no `.automated_script.sh` |
+
+Screenshots with the terminal output: `installed-final-binfmt-swaybg.png`,
+`installed-final-system.png`, `installed-final-root-locked.png`,
+`installed-final-root-check.png`.
+
+### What this does not prove, and one leftover
+
+- **UEFI is still unverified.** Every install, including this one, is
+  BIOS/MBR. The El Torito EFI section and the systemd-boot entry exist but no
+  firmware has booted them.
+- **Wine is still not shipped.** The binfmt rule and dispatcher are in place
+  and the service is healthy; running a `.exe` needs `wine` or Proton
+  installed first. The image says so rather than pretending.
+- **The ISO is still a CI artifact** with one-day retention; there is no
+  GitHub Release yet.
+- **`/etc/calamares` survives on the target** (`branding/`, `modules/`,
+  `settings.conf`). It is inert — the installed system does not run it
+  automatically — but it is installer state that a target does not need. The
+  cleanup job does not remove it; this is cosmetic, not a failure, and is
+  listed in `TODO.md` for the next build.
+- **The 16:10 strip is gone.** The earlier installed screenshot had ~80 px of
+  black at the bottom with console text; `swaybg -m fill` covers the output,
+  and the screenshots above show a clean bottom edge.

@@ -37,11 +37,13 @@ Everything under those two directories is upstream's tree, shipped unmodified:
 2. `~/.config/macshell/env` — the env file upstream's installer creates.
 3. `~/.config/macdock/settings.json` — `wallpaperPath` pinned to the shipped
    wallpaper so Liquid Glass has an image from the first start.
-4. `~/.config/hypr/hyprpaper.conf` + `~/Pictures/Wallpapers/Tahoe-{Dark,Light}.png`.
-5. `packages.x86_64` — quickshell/hyprland/hyprlock/hyprpaper are the *extra*
-   repository packages the upstream README asks for; `awww` (AUR) is left out
-   on purpose — everything Apple-UI-related works against hyprpaper + the
-   shipped wallpaper.
+4. `~/Pictures/Wallpapers/Tahoe-{Dark,Light}.png` — the shipped images;
+   the session starts `swaybg` on the pixman renderer from `hyprland.lua`
+   (see `docs/iso-session.md` §2a for why not hyprpaper).
+5. `packages.x86_64` — quickshell/hyprland/hyprlock/swaybg are the *extra*
+   repository packages the session needs; `awww` (AUR) is left out on
+   purpose — the default wallpaper is a static picture, and MacShell's
+   picker falls back to the running swaybg.
 
 ## Known-good upstream facts this integration relies on
 

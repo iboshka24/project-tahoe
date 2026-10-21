@@ -1,13 +1,14 @@
 # docs/iso-session.md — the live desktop session
 
-> Status: **booted in QEMU on 2026-10-19, with three defects found and fixed.**
-> `tests/check-iso.sh` (67 checks) proves every file the profile references
+> Status: **booted in QEMU; the 2026-10-21 image switches the wallpaper
+> daemon to swaybg after hyprpaper 0.8.4 crashed on a GPU-less VM.**
+> `tests/check-iso.sh` (115 checks) proves every file the profile references
 > exists, is syntactically sane and wired up; booting it is what found that the
 > kernel command line named a parameter no hook reads, that the first-boot
 > prompt held the desktop, and that the session config aborted at line 100.
 > All the evidence is in [`iso-boot.md`](iso-boot.md).
 >
-> Date: 2026-10-18, revised 2026-10-19.
+> Date: 2026-10-18, revised 2026-10-21.
 
 ---
 
@@ -28,12 +29,14 @@ the distribution a working macOS-looking desktop *today*, from packages.
 | MIT license | may be vendored, attributed, unchanged (REUSE: `MIT`) |
 
 Everything MacShell needs is in Arch's own `[extra]` repository as of
-2026-10: `quickshell 0.3.2-1`, `hyprland`, `hyprlock`, `hyprpaper`. The first
-party `[tahoe]` repository is also baked in (`tahoe-base`, `tahoe-uel`,
-`tahoe-compositor`): all three build from the `v0.1.0` tag on CI and land in
-the ISO (0.1.0-1, verified in run 39162703139, 2026-10-18). Nothing in the
-session wiring depends on them yet — `tahoe-uel`/`tahoe-compositor` binaries
-are present but unused until the UEL desktop integration task in `TODO.md` §5.
+2026-10: `quickshell 0.3.2-1`, `hyprland`, `hyprlock`, `swaybg`. (The
+original choice for the wallpaper was `hyprpaper`; §2a explains why it is
+gone.) The first party `[tahoe]` repository is also baked in (`tahoe-base`,
+`tahoe-uel`, `tahoe-compositor`): all three build from the `v0.1.0` tag on CI
+and land in the ISO (0.1.0-1, verified in run 39162703139, 2026-10-18).
+Nothing in the session wiring depends on them yet — `tahoe-uel`/`tahoe-compositor`
+binaries are present but unused until the UEL desktop integration task in
+`TODO.md` §5.
 
 ## 2. How a boot goes
 
@@ -46,12 +49,59 @@ syslinux / systemd-boot
             [needs systemd.firstboot=no, or the boot stops at the
              systemd-firstboot prompt before tty1 reaches bash_profile]
             └─ hyprland.lua
-               ├─ hl.exec_cmd("hyprpaper")            → ships wallpaper
+               ├─ env WLR_RENDERER=pixman swaybg -i …/Tahoe-Dark.png -m fill
+               │    → paints the wallpaper, no GPU needed (§2a)
                ├─ hl.exec_cmd("sh ~/.local/bin/macshell-start")
                │    waits for the Wayland socket, env, icon theme, qs -c MacShell,
                │    restarts on crash
                └─ layer rules (macdock/macspot/macbarbg blur) + binds
 ```
+
+### 2a. Why swaybg and not hyprpaper (2026-10-21)
+
+The 2026-10-20 image started `hyprpaper`, as every build before it had. Its
+desktop came up **plain black** with no error dialog. Inside the live
+session, `pgrep -a hyprpaper` printed nothing, and running it by hand gave:
+
+```
+DEBUG ]: Monitor Virtual-1 has no target: no wp will be created
+ERR from hyprtoolkit ]: [EGL] Command eglInitialize errored out with
+    EGL_NOT_INITIALIZED (0x12289): DR12: failed to create screen
+KMS: DRM_IOCTL_MODE_CREATE_DUMB failed: Permission denied
+ERR from aquamarine ]: Swapchain: Failed to acquire a buffer
+[1]+ Segmentation fault (core dumped) hyprpaper
+```
+
+Two separate faults were in that output. The first is a config format
+change in hyprpaper 0.8.x: `wallpaper=,path` (empty monitor means "all") is
+no longer parsed; the current syntax is a block with `monitor=` and
+`path=`. With that block, the "no target" line went away — and the crash
+remained. The second fault is the renderer: hyprpaper 0.8 renders through
+hyprtoolkit/Aquamarine, which wants a working GBM/EGL device. A QEMU
+`virtio-vga` without virgl has none, so EGL fails, GBM falls back to KMS
+dumb buffers, and those need DRM master — hence `Permission denied` even
+after `chmod 666 /dev/dri/*`. `AQ_RENDERER=pixman` was not honoured.
+
+The permission theory was tested and rejected: the live user `tahoe` is in
+no supplementary groups (`groups=1000`), `/dev/dri/renderD128` is
+`root:render 660`, but making both nodes world-writable did not change the
+error. Hyprland itself works because systemd-logind hands it a DRM fd;
+hyprpaper opens the device itself.
+
+`swaybg 1.2.2` with `WLR_RENDERER=pixman` uses the wlroots software
+renderer, needs no DRM access and paints a shm buffer. Run in the same live
+session it printed `Found config * for output Virtual-1 (Red Hat Inc. QEMU
+Monitor)` and the wallpaper appeared. It also fixes a 16:10 artefact found
+on the installed system: hyprpaper letterboxed the 16:9 wallpaper into a
+1280x800 output, leaving the bottom 80 px black with the tail of the tty1
+console showing through; `-m fill` covers the whole output.
+
+The package list and the autostart now use swaybg; `hyprpaper.conf` is
+removed. MacShell's glass does not depend on it: the path comes from
+`~/.config/macdock/settings.json` (`wallpaperPath`), with the picker in
+`MacBar.qml` restarting a running swaybg — that path now keeps
+`WLR_RENDERER=pixman` too, or a newly picked image would disappear in the
+same VM.
 
 Maintenance: Ctrl+Alt+F2..F6 gives an ordinary console; `root` has no
 password on the live image and `tahoe` can `sudo` without one.
@@ -66,7 +116,6 @@ password on the live image and `tahoe` can `sudo` without one.
 | `etc/sudoers.d/10-tahoe-live` | passwordless sudo, live image only |
 | `etc/locale.conf`, `etc/motd` | `C.UTF-8`, the greeting incl. keybinds |
 | `etc/skel/.config/hypr/hyprland.lua` | the session config (see iso/macshell-vendor.md for what is upstream's block) |
-| `etc/skel/.config/hypr/hyprpaper.conf` | default wallpaper daemon config |
 | `etc/skel/.config/quickshell/MacShell/` + `MacLock/` | vendored upstream (MIT, pinned commit) |
 | `etc/skel/.local/bin/macshell-start` | upstream's start script, verbatim |
 | `etc/skel/.config/macshell/env` | env overrides (upstream's file format) |
@@ -84,6 +133,11 @@ password on the live image and `tahoe` can `sudo` without one.
 | The vendored tree matches its signed provenance | `check-iso.sh` compares `macshell-vendor.md` to the pinned ref inside `vendor-macshell.sh` |
 
 ## 5. What has NOT been verified (be honest, in order)
+
+> Written 2026-10-18. The image has since been booted many times, installed
+> and booted from disk (docs/iso-installer.md §§8-9), so items 1, 2 and 5
+> below are historical. What is still open lives in
+> [`limitations.md`](limitations.md).
 
 1. The session has never been booted — not on real hardware, not in a VM.
    CI does produce the ISO (first green run 2026-10-18, run 39159947256:

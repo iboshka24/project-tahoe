@@ -6,6 +6,26 @@
 >
 > Дата: 2026-10-15 · ядро 6.18.55-1-cachyos-lts · x86_64 ·
 > Rust 1.99.0 · Swift 6.4.1 · коммит `cc03dba`.
+>
+> **Обновление 2026-10-21:** снимок ниже описывает `cc03dba`; текущее
+> состояние — в §0.
+
+---
+
+## 0. Актуальное состояние (2026-10-21)
+
+| Что | Состояние |
+|---|---|
+| ISO | собран в CI из `b95bb0f` (run 39511318414), артефакт 1 766 490 280 B, ISO SHA-256 `0e600270…67ed6`; хранится как артефакт с retention 1 день, GitHub Release нет |
+| Live | BIOS/MBR в QEMU; Hyprland + MacShell, обои на весь экран (`swaybg` + pixman) |
+| Установка | Calamares 3.4.2: чистая установка на новый 24 GiB qcow2, **без ручных правок**, экран «All done» |
+| Установленная система | грузится с диска сама до `tahoe-vm login:`; вход `tahoe`/`tahoe123` → рабочий стол; `systemctl --failed` → 0 |
+| Проверки | uid 1000, группа `wheel`; root `L`; `sudo -n` требует пароль; автологина нет; fstab UUID/ext4; `/boot` с ядром и initramfs; `ID=tahoe`; binfmt `active`; live-MOTD не протёк |
+| Обои | `hyprpaper 0.8.4` падал без GPU; заменён на `swaybg`; чёрная полоса на 16:10 исчезла |
+| Открыто | UEFI не проверен; Wine не в образе; Release нет; `/etc/calamares` остаётся на цели (косметика) |
+
+Подробности: [`iso-installer.md`](iso-installer.md) §9,
+[`iso-session.md`](iso-session.md) §2a, [`limitations.md`](limitations.md).
 
 ---
 
@@ -16,7 +36,7 @@ tests/check-all.sh
 ```
 
 ```
-15 passed, 0 failed, 1 skipped
+18 passed, 0 failed, 1 skipped
 ```
 
 Единственный skip — iOS SDK, который требует Apple ID. Всё остальное
@@ -230,6 +250,10 @@ prefix /home/ibrohim/.wine (not initialised):
 фикстуры. Что НЕ проверено: сборка ISO, загрузка, рендер Liquid Glass,
 MacLock через PAM. Детали — `docs/iso-session.md`.
 
+> **Устарело на 2026-10-21:** ISO собран, живая сессия загружена,
+> установка и загрузка с диска проверены — см. §0 и
+> `docs/iso-installer.md` §9.
+
 ### 4.1 Windows — PE запущен под Wine **и** под Proton
 
 Подтверждено запуском: настоящий PE, собранный здесь `clang`+`lld-link`,
@@ -349,7 +373,7 @@ project-tahoe/
 | Оболочка | **модель готова**, GUI нет | ни одного `wl_surface` |
 | Finder | **ядро готово**, GUI нет | операции с файлами полностью функциональны |
 | Слои совместимости | **интеграция готова**, запуска не было | не хватает одного звена на каждой стороне |
-| Дистрибутив | **заготовка** | ISO не собран |
+| Дистрибутив | **работает в BIOS/VM** | ISO собран, установлен и загружается с диска; UEFI и Release — открыты |
 
 ---
 

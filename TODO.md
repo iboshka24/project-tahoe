@@ -67,7 +67,7 @@ same code that defines the layout and palette. What is missing is the *client*:
 - [x] `iso/` gained a complete live desktop session (2026-10-18,
       `docs/iso-session.md`): Hyprland 0.55+ Lua config, vendored MacShell +
       MacLock (MIT, pinned commit), macshell-start, autologin skel,
-      wallpapers, hyprpaper defaults, NetworkManager/bluetooth service
+      wallpapers, swaybg wallpaper daemon, NetworkManager/bluetooth service
       links, conflict-free package list. Parse-checked by
       `tests/check-iso.sh` (also in `tests/check-all.sh`).
 - [x] `mkarchiso` in a clean chroot — done via CI (2026-10-18, GitHub run
@@ -98,12 +98,14 @@ same code that defines the layout and palette. What is missing is the *client*:
       banner gone. This is the first ISO that boots.
 - [ ] UEFI boot: the El Torito catalog has an EFI section, but no OVMF was
       available to boot it, so that path is fixed by inspection only.
-- [ ] `systemd-binfmt.service` **fails** on the live image. For a distro whose
-      headline is kernel-side format dispatch, that needs explaining.
-- [ ] Verify the rest of the session: does the wallpaper reach the screen
-      (hyprpaper is started above line 100 and did launch, but the background
-      is indistinguishable from a plain dark fill), clipboard/emoji IPC,
-      MacLock unlocking via PAM, dark/light pair.
+- [x] `systemd-binfmt.service` on the live image: the rule was packaged from
+      the `v0.1.0` tag (18 commits behind) and pointed at `/usr/bin/wine`;
+      build `142ad4d` snapshots HEAD, and on the 2026-10-20 ISO
+      `systemctl --failed` lists nothing. The image still ships no Wine.
+- [x] Wallpaper reaches the screen: `swaybg` + `WLR_RENDERER=pixman` after
+      hyprpaper 0.8.4 segfaulted without a GPU. Verified on the rebuilt ISO
+      and on the installed system, full 1280×800 (`docs/iso-session.md` §2a).
+- [ ] Verify clipboard/emoji IPC, MacLock unlocking via PAM, dark/light pair.
 - [ ] Publish a **GitHub Release**. The ISO is a CI artifact with
       `retention-days: 1`; there is no release, so `v0.1.0` currently points
       at nothing downloadable. One day after each build the image is gone.
@@ -131,7 +133,11 @@ for the program itself. `docs/iso-installer.md` has the whole picture.
 - [x] A whole install in a VM, and the installed system booted to the desktop
       (`docs/iso-installer.md` §8). The run needed two manual repairs because
       its ISO predated the package fixes.
-- [ ] Run the **rebuilt** ISO end to end with no manual step.
+- [x] Run the **rebuilt** ISO end to end with no manual step: run 39511318414,
+      clean install on a fresh 24 GiB qcow2, `All done`, disk booted alone,
+      `systemctl --failed` empty (`docs/iso-installer.md` §9).
+- [ ] Remove `/etc/calamares` (`branding/`, `modules/`, `settings.conf`) from
+      the target in the cleanup job; it is inert but should not be there.
 - [ ] UEFI install (host has no OVMF; the ESP path is untested).
 
 ## 6. Known-narrow, do not lose

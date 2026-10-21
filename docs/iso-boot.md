@@ -171,14 +171,6 @@ alignment absorbs them. The checksum is the check that matters.
 
 ## 7. Still true after all this
 
-- **`systemd-binfmt.service` fails** on the live image
-  (`Failed to start Set Up Additional Binary Formats`). For most distros that
-  is noise; for this one, whose kernel-side format dispatch is a headline
-  feature, it is a hole worth its own investigation.
-- **The wallpaper state is unknown.** `hyprpaper` is started before line 100
-  so it did launch, but whether the shipped wallpaper reached the screen was
-  not established — the background in the frame is dark, and the dark Tahoe
-  wallpaper is also dark.
 - **Nothing boots the EFI path yet.** The El Torito catalog has an EFI section
   (platform `0xef`), and `loader/entries/tahoe.conf` is fixed the same way as
   the syslinux one, but no UEFI firmware was available to this session
@@ -188,3 +180,9 @@ alignment absorbs them. The checksum is the check that matters.
   there is no GitHub Release, so the image stops being downloadable a day
   after it is built. A tag exists (`v0.1.0`); `gh release view v0.1.0` says
   `release not found`.
+
+Two bullets that used to be here were fixed later: the binfmt failure (the
+rule had been packaged from the `v0.1.0` tag, 18 commits behind the checkout;
+run 39464290091 rebuilt from HEAD and `systemctl --failed` is empty) and the
+unknown wallpaper (hyprpaper 0.8.4 cannot render on a GPU-less VM; see
+[`iso-session.md`](iso-session.md) §2a).
