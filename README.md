@@ -4,18 +4,25 @@ An Arch Linux-based distribution with a macOS-Tahoe-styled Wayland desktop and a
 single execution model for Linux ELF, Windows PE, macOS Mach-O/.app, AppImage
 and DMG-delivered applications.
 
+![Project Tahoe installed desktop](docs/images/tahoe-desktop.png)
+
+*The installed system after its first boot: Hyprland + MacShell, the Tahoe
+wallpaper and Dock. QEMU capture, 21 October 2026.*
+
 **Where things stand:** [`docs/STATUS.md`](docs/STATUS.md) — what is
 confirmed by running it, what is written but unverified, and what does not
 work. Start there.
 
-**Status: foundation plus.** The architecture, tooling and seven working
-crates exist; their tests pass and the shell renders real scenes with real
-text (see `TODO.md` for what is still ahead). There is no runnable desktop
-session built from the crates yet — the renderer is not yet a Wayland
-client — but the archiso profile now ships a complete live desktop instead:
-[Hyprland with a vendored MacShell session](https://github.com/0-ss/MacShell)
-(`docs/iso-session.md`). The ISO itself is still not built. See
-[ROADMAP.md](ROADMAP.md) for what that means and what comes next.
+**Status: installable; the Rust desktop is still ahead.** The architecture,
+tooling and seven working crates exist; their tests pass and the shell renders
+real scenes with real text (see `TODO.md` for what is still ahead). The archiso
+profile builds a bootable ISO that runs [Hyprland with a vendored MacShell
+session](https://github.com/0-ss/MacShell) and installs with Calamares; a clean
+install on the final image (CI run 39511318414) reached the installed desktop
+without manual repairs. The Rust shell is still not a Wayland client — the ISO
+uses the vendored shell. There is no release download yet; the ISO is a CI
+artifact (see `docs/limitations.md`). See [ROADMAP.md](ROADMAP.md) for what
+comes next.
 
 ---
 
@@ -62,14 +69,32 @@ actually own.
 | `tahoe-compositor` | ✅ compiles against Smithay 0.7 | `cargo build -p tahoe-compositor` |
 | `tahoe-shell` | ✅ model implemented (dock/workspaces/launcher index) | `cargo test -p tahoe-shell` |
 | `tahoe-diagnostics` | ✅ read-only probes | `cargo test -p tahoe-diagnostics` |
-| `iso/` archiso profile + MacShell live session | 🟡 written, **not yet built** | structural checks: `tests/check-iso.sh`; build: `iso/build.sh` / CI (`docs/iso-session.md`) |
-| `packages/` PKGBUILDs | 🟡 written, **not yet built** | needs `makepkg`/chroot |
-| `binfmt.d/` entries | 🟡 shipped as files, **not registered** | requires root + consent |
+| `iso/` archiso profile + MacShell live session | ✅ built, boots, installs | CI run 39511318414; clean-install evidence in `docs/iso-installer.md` §9 |
+| `packages/` PKGBUILDs | ✅ built into the ISO | `iso/build.sh` packages `tahoe-base`, `tahoe-compositor` and `tahoe-uel` from the checkout |
+| `binfmt.d/` entries | ✅ active in the installed system; a dev host still needs root + consent | `systemctl status systemd-binfmt` in `docs/iso-installer.md` §9 |
 | Tahoe Shell GUI | 🔴 not started | see ROADMAP |
 
-Nothing in this repository claims a successful ISO build, a successful Wine
-run, or a successful Darling run, because none of those have been performed
-here. `docs/research/` records exactly what was verified and what was not.
+The ISO has been built, booted and installed cleanly; the installed disk boots
+to Hyprland + MacShell on its own (evidence: `docs/iso-installer.md` §9).
+Host-side Wine/Proton PE runs have passed, but the ISO does not bundle Wine, so
+a `.exe` inside the installed system needs Wine installed first. Not verified
+yet: UEFI boot (the test host has no OVMF), Windows PE execution inside the
+installed system, and Darling GUI apps. `docs/limitations.md` has the list.
+
+## Screenshots
+
+The first image is the installed system with no windows open. Two more views:
+
+| Spotlight | Control Center |
+|:---:|:---:|
+| [![MacShell Spotlight over the Tahoe desktop](docs/images/tahoe-spotlight.png)](docs/images/tahoe-spotlight.png) | [![MacShell Control Center over the Tahoe desktop](docs/images/tahoe-control-center.png)](docs/images/tahoe-control-center.png) |
+
+*Left: MacShell Spotlight (`SUPER+Space`) on the installed desktop. Right:
+MacShell Control Center over the same wallpaper. Both are QEMU screendumps
+(1280x800), 21 October 2026.*
+
+The full verification record — including the login prompt, the binfmt rule and
+the swaybg process — is in [`docs/iso-installer.md`](docs/iso-installer.md) §9.
 
 ---
 
@@ -101,10 +126,66 @@ iso/      archiso profile — Hyprland + vendored MacShell live session
 packages/ PKGBUILDs (sources 0BSD, per Arch policy)
 binfmt.d/ binfmt_misc entries we ship
 fixtures/ synthetic binaries for the format tests + generator
-docs/     research findings, ADRs, testing strategy
+docs/     research findings, ADRs, testing strategy, README screenshots
 ```
 
 Full detail in [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
+## Credits
+
+Tahoe is assembled from other people's work. The projects and people below
+shape the desktop, the installer and the execution model; this is attribution,
+not a claim of authorship. Vendored code and notices are recorded in
+[`NOTICE`](NOTICE), [`LICENSING.md`](LICENSING.md) and
+[`iso/macshell-vendor.md`](iso/macshell-vendor.md).
+
+**Desktop**
+
+- **[MacShell](https://github.com/0-ss/MacShell)** / **MacLock** — Rickky
+  ([0-ss](https://github.com/0-ss)), MIT. Menu bar, Dock, Spotlight, Control
+  Center, widgets and lock screen; vendored unmodified at `eb3d89f`.
+- **[Hyprland](https://hypr.land/)** — Vaxry ([vaxry](https://github.com/vaxry))
+  and contributors, BSD-3-Clause. The Wayland compositor and its Lua
+  configuration API.
+- **[Quickshell](https://quickshell.org/)** — outfoxxed
+  ([outfoxxed](https://github.com/outfoxxed)) and contributors, LGPL-3.0-only.
+  The QtQuick runtime the MacShell session runs on.
+- **[swaybg](https://github.com/swaywm/swaybg)** — the sway/wlroots
+  contributors, MIT. The wallpaper daemon, run with the pixman renderer in VMs.
+- **[Papirus](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme)** —
+  Papirus Development Team, GPL-3.0. Icon theme.
+- **[Inter](https://rsms.me/inter/)** — Rasmus Andersson, SIL OFL 1.1.
+- **[Noto](https://fonts.google.com/noto)** — Google and contributors, SIL OFL
+  1.1.
+- **[kitty](https://sw.kovidgoyal.net/kitty/)** — Kovid Goyal, GPL-3.0-only.
+
+**Installer and base**
+
+- **[Calamares](https://calamares.io/)** — the Calamares team and contributors,
+  GPL-3.0-or-later. The graphical installer; the `tahoe` branding and module
+  configuration are this project's.
+- **[Arch Linux](https://archlinux.org/)** and
+  **[archiso](https://github.com/archlinux/archiso)** — Arch Linux contributors,
+  GPL-3.0-or-later for archiso; individual packages keep their own licenses.
+- **[CachyOS](https://cachyos.org/)** — the Calamares-based installer follows
+  the same upstream-plus-own-branding approach as CachyOS; no CachyOS code is
+  imported. Thanks for the reference.
+
+**Execution model**
+
+- **[Wine](https://www.winehq.org/)** — WineHQ and contributors,
+  LGPL-2.1-or-later. Windows PE execution, out of process; not bundled.
+- **[Darling](https://www.darlinghq.org/)** — Darling contributors,
+  GPL-3.0-or-later. Mach-O execution, out of process; not bundled.
+
+The base system is assembled from Arch Linux packages; each package carries its
+own copyright and license. Screenshots are QEMU captures taken for this project.
+
+macOS and macOS Tahoe are trademarks of Apple Inc. Project Tahoe is an
+independent tribute and is not affiliated with or endorsed by Apple. See
+[`TRADEMARKS.md`](TRADEMARKS.md).
 
 ---
 

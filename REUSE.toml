@@ -18,6 +18,13 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Project Tahoe contributors"
 SPDX-License-Identifier = "CC0-1.0"
 
+# README screenshots: QEMU captures of the installed system, first-party.
+[[annotations]]
+path = "docs/images/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Project Tahoe contributors"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
+
 # Vendored upstream MacShell/MacLock (https://github.com/0-ss/MacShell).
 # The tree ships unmodified; see iso/macshell-vendor.md for the pin.
 [[annotations]]

@@ -13,6 +13,13 @@ the MacShell live desktop by Rickky (0-ss/MacShell). Their authorship, licenses,
 and notices remain with their respective holders. See LICENSING.md,
 REUSE.toml, iso/macshell-vendor.md, and the vendored component notices.
 
+The live desktop also runs on Hyprland (BSD-3-Clause; Vaxry and the Hyprland
+contributors) and Quickshell (LGPL-3.0-only; outfoxxed and contributors). The
+graphical installer is Calamares (GPL-3.0-or-later; the Calamares team and
+contributors), and the live image is built with Arch Linux and archiso
+(GPL-3.0-or-later; Arch Linux contributors). These components run as separate
+programs; their own licenses and notices apply.
+
 This NOTICE provides attribution only; it does not modify the software licenses.
 When distributing under Apache-2.0, handle this NOTICE as required by section
 4(d) of that license. Under MIT, preserve its copyright and permission notice.
