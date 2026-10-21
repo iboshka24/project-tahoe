@@ -344,7 +344,7 @@ whole 1280×800 output and all four widget cards drawn — large Clock and
 Calendar on top, medium Weather and Player below. The Weather card is the
 load-bearing check here: it showed `Yosemite Valley 13 °C` fetched from
 Open-Meteo, so the session had working network, not just a styled layout.
-Capture: `vm-live/frame-090.png`.
+Capture: `Pictures/tahoe/tahoe-021-live-desktop.png`.
 
 ### The install
 
@@ -353,7 +353,7 @@ presses walked Welcome → Location → Keyboard → Partitions → Users, the f
 filled with `Tahoe User` / `tahoe` / `tahoe-vm` / `tahoe123`, `Alt+N` showed the
 summary (erase `/dev/vda`, one ext4 partition, GRUB on `/dev/vda`) and `Alt+I`
 started it. It ended at `All done.` with no terminal opened and no command run
-in a chroot. Capture: `vm-install/progress-2.png`.
+in a chroot. Capture: `Pictures/tahoe/tahoe-021-install-done.png`.
 
 ### The installed disk alone
 
@@ -364,10 +364,11 @@ Project Tahoe 0.2 7.2.11-arch1-1 (tty1)
 tahoe-vm login:
 ```
 
-on its own — no autologin, as designed. Logging in as `tahoe` / `tahoe123`
-started Hyprland + MacShell with the photograph and all four widgets on screen.
-The captures from that session are the README images: `tahoe-desktop.png`,
-`tahoe-spotlight.png`, `tahoe-control-center.png`.
+on its own — no autologin, as designed (`tahoe-021-installed-login.png`).
+Logging in as `tahoe` / `tahoe123` started Hyprland + MacShell with the
+photograph and all four widgets on screen. The captures from that session are
+the README images: `tahoe-desktop.png`, `tahoe-spotlight.png`,
+`tahoe-control-center.png`.
 
 ### What was checked inside the installed system
 
@@ -381,8 +382,9 @@ The captures from that session are the README images: `tahoe-desktop.png`,
 | new packages | `pacman -Q jq curl playerctl qt6-multimedia swaybg` | `jq 1.8.2-1`, `curl 8.23.0-1`, `playerctl 2.4.1-5`, `qt6-multimedia 6.12.0-1`, `swaybg 1.2.2-1` |
 | autologin | login prompt instead of a session | live getty drop-in removed, as in §8/§9 |
 
-Screenshots with the terminal output: `vm-install/verify.png`,
-`vm-install/verify2.png`.
+Screenshots with the terminal output:
+`Pictures/tahoe/tahoe-021-installed-verify.png`,
+`Pictures/tahoe/tahoe-021-installed-verify2.png`.
 
 ### What this does not prove, and two leftovers
 
