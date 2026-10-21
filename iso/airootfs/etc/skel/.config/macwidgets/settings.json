@@ -1,0 +1,48 @@
+{
+  "tempUnit": "C",
+  "locMode": "city",
+  "cityName": "Yosemite Valley",
+  "widgetScale": 1.0,
+  "widgets": [
+    {
+      "id": "clock",
+      "type": "clock",
+      "style": "liquid",
+      "size": "large",
+      "mode": "auto",
+      "src": "",
+      "x": 21,
+      "y": 56
+    },
+    {
+      "id": "calendar",
+      "type": "calendar",
+      "style": "liquid",
+      "size": "large",
+      "mode": "auto",
+      "src": "",
+      "x": 435,
+      "y": 56
+    },
+    {
+      "id": "weather",
+      "type": "weather",
+      "style": "liquid",
+      "size": "medium",
+      "mode": "auto",
+      "src": "",
+      "x": 21,
+      "y": 460
+    },
+    {
+      "id": "player",
+      "type": "player",
+      "style": "liquid",
+      "size": "medium",
+      "mode": "auto",
+      "src": "",
+      "x": 435,
+      "y": 460
+    }
+  ]
+}

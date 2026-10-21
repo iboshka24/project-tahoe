@@ -16,7 +16,7 @@
 set -euo pipefail
 
 REPO_URL="${MACSHELL_URL:-https://github.com/0-ss/MacShell.git}"
-PINNED_REF="eb3d89f9331cb18827b17cf4dd7e3d8c26bf433a"
+PINNED_REF="eebaaad667bc847287dc8baeda93dbec97401fa4"
 REF="${1:-$PINNED_REF}"
 DEST="$(cd "$(dirname "$0")" && pwd)/airootfs/etc/skel/.config/quickshell"
 

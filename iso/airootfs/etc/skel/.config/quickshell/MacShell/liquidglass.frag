@@ -37,6 +37,7 @@ layout(std140, binding = 0) uniform buf {
     float shadowAmt;    // drop-shadow strength (1 = original, 0 = none) - appended last so older layouts stay compatible
     float rimTint;      // 0 = white rim (Dock / Menu Bar), 1 = rim + border take a brighter shade of the glass's own colour (widgets)
     float ringW;        // width in px of a thin border line along the very edge (0 = none)
+    float flatInner;    // 1 = no inner edge shading (the darker inner rim); 0 = original. Appended last, unset = 0
 };
 
 layout(binding = 1) uniform sampler2D src;
@@ -161,8 +162,9 @@ void main()
     // ── depth: soft top sheen, darker lower inner edge ──
     float ty = clamp((q.y + hs.y) / glassSize.y, 0.0, 1.0);
     col += (1.0 - ty) * mix(0.040, 0.030, dark);
-    col *= 1.0 - 0.12 * exp(-t / 6.0) * clamp(g.y, 0.0, 1.0);
-    col *= 1.0 - 0.10 * exp(-t / (bz * 0.45));          // thick glass absorbs light toward the edge (heavier feel)
+    float innerK = 1.0 - clamp(flatInner, 0.0, 1.0);
+    col *= 1.0 - 0.12 * exp(-t / 6.0) * clamp(g.y, 0.0, 1.0) * innerK;
+    col *= 1.0 - 0.10 * exp(-t / (bz * 0.45)) * innerK;          // thick glass absorbs light toward the edge (heavier feel)
 
     // colour of the rim / border: white, or (rimTint) a brighter shade of what the glass looks like at this spot
     vec3 rimCol = mix(vec3(0.96, 0.98, 1.0), clamp(col * 1.5 + 0.12, 0.0, 1.0), rimTint);
@@ -186,6 +188,21 @@ void main()
     if (ringW > 0.0) {
         float ring = 1.0 - smoothstep(ringW * 0.5, ringW * 0.5 + 1.0, t);
         col = mix(col, rimCol, ring * (0.55 + 0.35 * clamp(facing * 0.5 + 0.5, 0.0, 1.0)));
+    }
+
+    // ringW < 0: "corner light" border. A line (|ringW| px) that runs all the way round the glass and fades out only at the
+    // top-right and bottom-left corners, and takes a bright shade of the backdrop colour at that spot (dynamic: it follows what
+    // is behind the glass). Used by the Control Center; everything else keeps ringW >= 0 and is unchanged.
+    if (ringW < 0.0) {
+        float rw   = -ringW;
+        float ring = 1.0 - smoothstep(rw * 0.5, rw * 0.5 + 1.0, t);
+        float glow = exp(-t / (rw * 2.2)) * 0.30;
+        float fall = max(r * 3.0, 26.0);
+        float wTR  = pow(clamp(1.0 - length(q - vec2( hs.x, -hs.y)) / fall, 0.0, 1.0), 1.2);
+        float wBL  = pow(clamp(1.0 - length(q - vec2(-hs.x,  hs.y)) / fall, 0.0, 1.0), 1.2);
+        float cw   = 1.0 - max(wTR, wBL);
+        vec3  ringCol = clamp(col * 2.0 + 0.18, 0.0, 1.0);
+        col = mix(col, ringCol, clamp((ring + glow) * cw, 0.0, 1.0) * 0.95);
     }
 
     // fine triangular-distribution grain, same on every channel so it reads as texture, not colour noise

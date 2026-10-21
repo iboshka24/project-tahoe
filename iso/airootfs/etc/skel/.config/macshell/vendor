@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# The version of the MacShell tree installed into this home by Calamares.
+# Kept next to env so an installed system can be checked without git.
+MACSHELL_VERSION=0.2.8
+MACSHELL_COMMIT=eebaaad667bc847287dc8baeda93dbec97401fa4
+MACSHELL_VENDORED=2026-10-21

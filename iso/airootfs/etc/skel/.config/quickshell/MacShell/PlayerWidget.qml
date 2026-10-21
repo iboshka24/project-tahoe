@@ -14,6 +14,7 @@
 // togglePlaying() / nextTrack() / previousTrack().
 import QtQuick
 import QtQuick.Effects
+import "I18n.js" as I18n
 
 Item {
     id: w
@@ -23,7 +24,7 @@ Item {
     property string size: "small"
     property real scaleF: 1.0
     property real contentScale: 1.0          // scales art / text / buttons; the card itself keeps the widget's full size
-    property string fam: "Inter"
+    property string fam: "Open Runde"
     property real screenX: x
     property real screenY: y
     property bool preview: false             // inside the Settings gallery: sample data, no wallpaper, not clickable
@@ -71,6 +72,7 @@ Item {
     property real glassBlur: 5
     property real glassLiquid: 1.0
     property real glassRim: 0.45
+    property color borderTint: "#8A9AB5"      // Control Center border colour
     property real glassGrain: 0.03
     property bool darkGlass: true
 
@@ -294,9 +296,10 @@ Item {
                 property real saturation: 1.25
                 property real dark: w.dark ? 1 : 0
                 property real debug: 0
-                property real shadowAmt: 1
+                property real shadowAmt: 0           // no drop shadow
+                property real flatInner: 1           // no darker inner edge (needs the rebuilt liquidglass shader)
                 property real rimTint: 1
-                property real ringW: 1
+                property real ringW: 0
             }
         }
     }
@@ -310,14 +313,14 @@ Item {
         color: Qt.rgba(w.ac.r, w.ac.g, w.ac.b, w.dark ? 0.46 : 0.34)
     }
 
-    // thin border (Light / Dark and the frosted fallback). The Liquid Glass border is drawn by the shader itself.
-    Rectangle {
+    // Control Center border (all styles)
+    CornerBorder {
+        z: 2
         anchors.fill: parent
-        visible: !w.glassOn
-        radius: w.radiusPx
-        color: "transparent"
-        border.width: 1
-        border.color: w.borderCol
+        cornerR: w.radiusPx
+        dark: w.dark
+        tint: w.borderTint
+        lineW: 0.8
     }
 
     // ───────────────────────── content ─────────────────────────
@@ -347,7 +350,7 @@ Item {
     readonly property real shownFrac: seekShown ? seekFrac : progress
     readonly property real shownPos: seekShown ? seekFrac * length : position
     Timer { id: seekHoldTimer; interval: 900; onTriggered: w.seekHold = false }
-    readonly property string shownTitle: hasPlayer ? (title !== "" ? title : "Unknown Title") : "Not Playing"
+    readonly property string shownTitle: hasPlayer ? (title !== "" ? title : I18n.tr("Unknown Title")) : I18n.tr("Not Playing")
     readonly property string shownSub: hasPlayer ? (artist !== "" ? (album !== "" ? artist + " \u2014 " + album : artist) : album)
                                                  : "Open a music app"
 
@@ -548,7 +551,7 @@ Item {
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
                 visible: w.lyrics.length === 0
-                text: w.lyricsState === "none" ? "No lyrics found" : "Searching for lyrics\u2026"
+                text: w.lyricsState === "none" ? I18n.tr("No lyrics found") : I18n.tr("Searching for lyrics\u2026")
                 color: w.fg2
                 font.family: w.fam
                 font.pixelSize: 20 * w.k

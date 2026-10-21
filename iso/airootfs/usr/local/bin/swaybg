@@ -1,0 +1,16 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Tahoe's swaybg wrapper.
+#
+# The live and installed sessions run in QEMU with virtio-vga but no 3D, so
+# wlroots' GL renderer cannot create an EGL context.  Tahoe starts swaybg from
+# hyprland.lua with WLR_RENDERER=pixman; MacShell's wallpaper picker restarts
+# swaybg with `setsid swaybg` and (as of MacShell 0.2.8) does not carry that
+# variable.  This wrapper makes every caller use pixman unless it explicitly
+# asked for another renderer.  It is first-party glue, not an upstream edit.
+if [ -z "${WLR_RENDERER:-}" ]; then
+    WLR_RENDERER=pixman
+    export WLR_RENDERER
+fi
+exec /usr/bin/swaybg "$@"

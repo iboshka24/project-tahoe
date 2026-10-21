@@ -123,3 +123,21 @@ hl.window_rule({ name = "float-zenity",  match = { class = "zenity" },  float = 
 hl.window_rule({ name = "float-kdialog", match = { class = "kdialog" }, float = true })
 -- xdg-desktop-portal's screencast / screenshot chooser
 hl.window_rule({ name = "float-portal",  match = { title = "Screencast" }, float = true })
+
+-- MacShell 0.2.8 draws its own Settings / About windows.  Keep Hyprland's
+-- border off and give the translucent cards the same soft edge as upstream's
+-- installer block.
+hl.window_rule({
+    name = "macshell-settings",
+    match = { title = "^macshell Settings$" },
+    opacity = "0.82 0.85 1",
+    border_size = 0,
+    rounding = 12,
+})
+hl.window_rule({
+    name = "macshell-about",
+    match = { title = "^About This Linux$" },
+    opacity = "0.82 0.85 1",
+    border_size = 0,
+    rounding = 18,
+})

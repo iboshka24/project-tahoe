@@ -22,6 +22,10 @@ import Quickshell.Io
 import Quickshell.Hyprland
 
 ShellRoot {
+    // The UI font ("Open Runde") ships with MacShell: registered here, first, so every Text below can use it
+    // without installing anything. (The installer also copies it to ~/.local/share/fonts.)
+    FontLoader { id: uiFontLoader; source: Qt.resolvedUrl("assets/fonts/OpenRunde-Regular.otf") }
+
     Scope {
         id: sharedHub
 
@@ -34,6 +38,7 @@ ShellRoot {
         property var dock: macDock
         property var widgets: macWidgets
         property var clock: clockApp
+        property var about: aboutApp
         function openSettings(pane) { macDock.openPrefs(pane); }
 
         // set by MacBar / MacDock (Binding elements) when their glass needs live data
@@ -269,6 +274,7 @@ ShellRoot {
     MacDock { id: macDock; hub: sharedHub }
     MacWidgets { id: macWidgets; hub: sharedHub }
     ClockApp { id: clockApp; hub: sharedHub }
+    AboutApp { id: aboutApp; hub: sharedHub }
 
     // reopen settings even when both the Dock and the Menu Bar are disabled:
     //   qs -c macbar ipc call settings open
@@ -285,6 +291,13 @@ ShellRoot {
         function tab(name: string): void { clockApp.open(name); }
         function stop(): void { clockApp.stopRing(); }
         function snooze(): void { clockApp.snooze(); }
+    }
+    // qs -c MacShell ipc call about open | close | toggle      (the Apple menu's "About This Linux")
+    IpcHandler {
+        target: "about"
+        function open(): void { aboutApp.open(); }
+        function close(): void { aboutApp.close(); }
+        function toggle(): void { aboutApp.toggle(); }
     }
     IpcHandler {
         target: "notifications"

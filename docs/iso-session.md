@@ -1,12 +1,14 @@
 # docs/iso-session.md — the live desktop session
 
 > Status: **booted in QEMU; the 2026-10-21 image switches the wallpaper
-> daemon to swaybg after hyprpaper 0.8.4 crashed on a GPU-less VM.**
-> `tests/check-iso.sh` (115 checks) proves every file the profile references
-> exists, is syntactically sane and wired up; booting it is what found that the
-> kernel command line named a parameter no hook reads, that the first-boot
-> prompt held the desktop, and that the session config aborted at line 100.
-> All the evidence is in [`iso-boot.md`](iso-boot.md).
+> daemon to swaybg after hyprpaper 0.8.4 crashed on a GPU-less VM. The
+> desktop now also ships MacShell 0.2.8's widgets, a first-run layout and a
+> Yosemite photograph as the default wallpaper.**
+> `tests/check-iso.sh` proves every file the profile references exists, is
+> syntactically sane and wired up; booting it is what found that the kernel
+> command line named a parameter no hook reads, that the first-boot prompt
+> held the desktop, and that the session config aborted at line 100. All the
+> evidence is in [`iso-boot.md`](iso-boot.md).
 >
 > Date: 2026-10-18, revised 2026-10-21.
 
@@ -29,9 +31,10 @@ the distribution a working macOS-looking desktop *today*, from packages.
 | MIT license | may be vendored, attributed, unchanged (REUSE: `MIT`) |
 
 Everything MacShell needs is in Arch's own `[extra]` repository as of
-2026-10: `quickshell 0.3.2-1`, `hyprland`, `hyprlock`, `swaybg`. (The
-original choice for the wallpaper was `hyprpaper`; §2a explains why it is
-gone.) The first party `[tahoe]` repository is also baked in (`tahoe-base`,
+2026-10: `quickshell 0.3.2-1`, `hyprland`, `hyprlock`, `swaybg`, plus
+`qt6-multimedia` for the QML import and `jq`/`curl`/`playerctl` for MacLock,
+the Weather widget and the hardware-key fallback. (The original choice for
+the wallpaper was `hyprpaper`; §2a explains why it is gone.) The first party `[tahoe]` repository is also baked in (`tahoe-base`,
 `tahoe-uel`, `tahoe-compositor`): all three build from the `v0.1.0` tag on CI
 and land in the ISO (0.1.0-1, verified in run 39162703139, 2026-10-18).
 Nothing in the session wiring depends on them yet — `tahoe-uel`/`tahoe-compositor`
@@ -99,9 +102,35 @@ console showing through; `-m fill` covers the whole output.
 The package list and the autostart now use swaybg; `hyprpaper.conf` is
 removed. MacShell's glass does not depend on it: the path comes from
 `~/.config/macdock/settings.json` (`wallpaperPath`), with the picker in
-`MacBar.qml` restarting a running swaybg — that path now keeps
-`WLR_RENDERER=pixman` too, or a newly picked image would disappear in the
-same VM.
+`MacBar.qml` restarting a running swaybg. MacShell 0.2.8's picker does not
+set `WLR_RENDERER` itself, so Tahoe ships `/usr/local/bin/swaybg`, a small
+first-party wrapper that adds `WLR_RENDERER=pixman` when the variable is
+unset and then execs `/usr/bin/swaybg`. A newly picked image therefore also
+uses the software renderer in this VM.
+
+### 2b. First-run desktop and the installed copy of its config
+
+The live user's home is populated by mkarchiso from `/etc/skel`, so the
+2026-10-21 image starts with:
+
+- MacShell 0.2.8 (upstream commit `eebaaad`), vendored unmodified;
+- a `~/.config/macwidgets/settings.json` layout that places the large Clock
+  and Calendar and the medium Weather and Player cards on the left of the
+  desktop (the same cards shown in the upstream screenshots);
+- the CC0 Yosemite photograph as `Tahoe-Dark.png`, painted full-screen by
+  `swaybg -m fill`;
+- `~/.config/macshell/vendor` recording the pin.
+
+Calamares' `shellprocess` runs before `users`: it deletes the live `tahoe`
+account and its home, then the `users` module creates the install-time user
+and copies `/etc/skel` into the new home. The installed desktop is therefore
+not a stale copy of the live home; it is the same current `/etc/skel` tree,
+including the widget layout and the version marker. This was checked on the
+clean install after the rebuild (see [`iso-installer.md`](iso-installer.md)).
+
+The Weather card needs network access (Open-Meteo). Without it the card still
+occupies its slot and reports the lookup failure; the Clock, Calendar, Player,
+wallpaper and Dock do not depend on the network.
 
 Maintenance: Ctrl+Alt+F2..F6 gives an ordinary console; `root` has no
 password on the live image and `tahoe` can `sudo` without one.
@@ -119,8 +148,15 @@ password on the live image and `tahoe` can `sudo` without one.
 | `etc/skel/.config/quickshell/MacShell/` + `MacLock/` | vendored upstream (MIT, pinned commit) |
 | `etc/skel/.local/bin/macshell-start` | upstream's start script, verbatim |
 | `etc/skel/.config/macshell/env` | env overrides (upstream's file format) |
+| `etc/skel/.config/macshell/vendor` | installed MacShell version: `0.2.8`, commit `eebaaad`; proves the user home was populated from the current `/etc/skel` |
 | `etc/skel/.config/macdock/settings.json` | `wallpaperPath` → shipped wallpaper |
-| `etc/skel/Pictures/Wallpapers/Tahoe-{Dark,Light}.png` | first boot wallpaper pair, generated gradients |
+| `etc/skel/.config/macwidgets/settings.json` | first-run widget layout: large Clock + Calendar, medium Weather + Player |
+| `etc/skel/Pictures/Wallpapers/Tahoe-Dark.png` | default wallpaper: CC0 Yosemite Valley photograph by EF5, cropped to 1920×1200 |
+| `etc/skel/Pictures/Wallpapers/Tahoe-Light.png` | light-appearance wallpaper: first-party Tahoe gradient |
+
+The dark wallpaper is EF5's CC0 photograph
+[“Tunnel View” overlook, file 03](https://commons.wikimedia.org/wiki/File:%E2%80%9CTunnel_View%E2%80%9D_overlook_showing_famous_rock_formations_in_Yosemite_Valley_03.jpg),
+cropped to 1920×1200 and stripped of metadata; see `NOTICE` and `REUSE.toml`.
 
 ## 4. What has been verified (and how)
 

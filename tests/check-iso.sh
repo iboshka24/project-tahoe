@@ -54,7 +54,9 @@ printf '\033[1m== ISO profile: files exist ==\033[0m\n'
 for f in \
     "$LUA" \
     iso/airootfs/etc/skel/.config/macshell/env \
+    iso/airootfs/etc/skel/.config/macshell/vendor \
     iso/airootfs/etc/skel/.config/macdock/settings.json \
+    iso/airootfs/etc/skel/.config/macwidgets/settings.json \
     iso/airootfs/etc/skel/.bash_profile \
     iso/airootfs/etc/skel/.local/bin/macshell-start \
     iso/airootfs/usr/local/bin/tahoe-installer \
@@ -97,8 +99,26 @@ check_grep "Liquid Glass blur requested"            'name = "macdock".*blur = tr
 check_grep "session-lock restore for MacLock"       'allow_session_lock_restore' "$LUA"
 check_grep "wallpaper is served by swaybg"          'env WLR_RENDERER=pixman swaybg -i /home/tahoe/Pictures/Wallpapers/Tahoe-Dark.png -m fill' "$LUA"
 check_not_grep "hyprpaper is not autostarted"        'exec_cmd\("hyprpaper"\)' "$LUA"
-check_grep "the wallpaper picker keeps pixman"       'WLR_RENDERER=pixman setsid swaybg' \
+check_grep "the wallpaper picker uses swaybg"        'setsid swaybg' \
     iso/airootfs/etc/skel/.config/quickshell/MacShell/MacBar.qml
+check_exists "the pixman swaybg wrapper ships"        iso/airootfs/usr/local/bin/swaybg
+check_grep "the wrapper defaults to pixman"           'WLR_RENDERER=pixman' iso/airootfs/usr/local/bin/swaybg
+check_grep "the wrapper is executable in the image"   '/usr/local/bin/swaybg' iso/profiledef.sh
+
+# The installed home must identify the MacShell pin, and the first-run
+# layout must exercise all four upstream widget types.
+check_grep "installed MacShell version marker"       'MACSHELL_VERSION=0.2.8' \
+    iso/airootfs/etc/skel/.config/macshell/vendor
+check_grep "installed MacShell commit marker"        'MACSHELL_COMMIT=eebaaad667bc847287dc8baeda93dbec97401fa4' \
+    iso/airootfs/etc/skel/.config/macshell/vendor
+check_grep "first-run Clock widget"                  '"type": "clock"' \
+    iso/airootfs/etc/skel/.config/macwidgets/settings.json
+check_grep "first-run Calendar widget"               '"type": "calendar"' \
+    iso/airootfs/etc/skel/.config/macwidgets/settings.json
+check_grep "first-run Weather widget"                '"type": "weather"' \
+    iso/airootfs/etc/skel/.config/macwidgets/settings.json
+check_grep "first-run Player widget"                 '"type": "player"' \
+    iso/airootfs/etc/skel/.config/macwidgets/settings.json
 
 # the vendored start script must be the upstream one by name and shape
 check_grep "macshell-start waits for the socket"    'WAYLAND_DISPLAY' iso/airootfs/etc/skel/.local/bin/macshell-start
@@ -160,7 +180,8 @@ done
 # ---------------------------------------------------------------------------
 printf '\033[1m== Package list ==\033[0m\n'
 
-for p in hyprland quickshell qt6-shadertools qt6-svg hyprlock swaybg \
+for p in hyprland quickshell qt6-shadertools qt6-svg qt6-multimedia \
+         hyprlock swaybg jq curl playerctl \
          pipewire wireplumber networkmanager kitty papirus-icon-theme; do
     check_grep "packages list has $p" "^$p$" "$PKG"
 done
@@ -181,6 +202,8 @@ printf '\033[1m== Syntax of shipped scripts ==\033[0m\n'
 
 sh -n iso/airootfs/etc/skel/.local/bin/macshell-start 2>/dev/null &&
     ok "macshell-start parses (sh)" || bad "macshell-start has a syntax error"
+sh -n iso/airootfs/usr/local/bin/swaybg 2>/dev/null &&
+    ok "the swaybg wrapper parses (sh)" || bad "the swaybg wrapper has a syntax error"
 bash -n iso/build.sh 2>/dev/null &&
     ok "build.sh parses" || bad "build.sh has a syntax error"
 bash -n iso/vendor-macshell.sh 2>/dev/null &&
@@ -192,6 +215,11 @@ if python3 -m json.tool iso/airootfs/etc/skel/.config/macdock/settings.json >/de
     ok "macdock settings.json is valid JSON"
 else
     bad "macdock settings.json is not JSON"
+fi
+if python3 -m json.tool iso/airootfs/etc/skel/.config/macwidgets/settings.json >/dev/null 2>&1; then
+    ok "macwidgets settings.json is valid JSON"
+else
+    bad "macwidgets settings.json is not JSON"
 fi
 
 # ---------------------------------------------------------------------------
@@ -213,6 +241,7 @@ for f in \
     iso/airootfs/etc/skel/.config/macshell/env \
     iso/airootfs/etc/skel/.local/bin/macshell-start \
     iso/airootfs/usr/local/bin/tahoe-installer \
+    iso/airootfs/usr/local/bin/swaybg \
     iso/airootfs/etc/passwd \
     iso/airootfs/etc/shadow \
     iso/airootfs/etc/sudoers.d/10-tahoe-live \
@@ -231,6 +260,10 @@ if [[ -d .git ]]; then
     MODE=$(git ls-files -s iso/airootfs/etc/skel/.local/bin/macshell-start | awk '{print $1}')
     if [[ "$MODE" == "100755" ]]; then ok "macshell-start has the executable bit"
     else bad "macshell-start should be git mode 100755, is '$MODE'"; fi
+
+    MODE=$(git ls-files -s iso/airootfs/usr/local/bin/swaybg | awk '{print $1}')
+    if [[ "$MODE" == "100755" ]]; then ok "the swaybg wrapper has the executable bit"
+    else bad "the swaybg wrapper should be git mode 100755, is '$MODE'"; fi
 
     for s in build.sh vendor-macshell.sh; do
         MODE=$(git ls-files -s "iso/$s" | awk '{print $1}')

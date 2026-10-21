@@ -20,6 +20,17 @@ contributors), and the live image is built with Arch Linux and archiso
 (GPL-3.0-or-later; Arch Linux contributors). These components run as separate
 programs; their own licenses and notices apply.
 
+The default desktop wallpaper is a photograph of Yosemite Valley by EF5,
+released under CC0 1.0 Universal and obtained from Wikimedia Commons
+(“Tunnel View” overlook, file 03); Project Tahoe cropped and resized it to
+1920×1200. The source page is recorded in docs/iso-session.md. The white
+Tahoe-Light gradient is first-party.
+
+The two detail screenshots in docs/images named `macshell-upstream-*` come
+from the MacShell README by Rickky (0-ss/MacShell) and are reproduced under
+that repository's MIT license; they are labelled as upstream reference shots,
+not as captures of Tahoe.
+
 This NOTICE provides attribution only; it does not modify the software licenses.
 When distributing under Apache-2.0, handle this NOTICE as required by section
 4(d) of that license. Under MIT, preserve its copyright and permission notice.

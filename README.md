@@ -6,8 +6,8 @@ and DMG-delivered applications.
 
 ![Project Tahoe installed desktop](docs/images/tahoe-desktop.png)
 
-*The installed system after its first boot: Hyprland + MacShell, the Tahoe
-wallpaper and Dock. QEMU capture, 21 October 2026.*
+*The installed system after its first boot: Hyprland + MacShell 0.2.8, the
+Yosemite wallpaper, desktop widgets and Dock. QEMU capture, 21 October 2026.*
 
 **Where things stand:** [`docs/STATUS.md`](docs/STATUS.md) — what is
 confirmed by running it, what is written but unverified, and what does not
@@ -93,6 +93,17 @@ The first image is the installed system with no windows open. Two more views:
 MacShell Control Center over the same wallpaper. Both are QEMU screendumps
 (1280x800), 21 October 2026.*
 
+### The MacShell upstream reference
+
+These two detail shots come from the [MacShell repository's own
+README](https://github.com/0-ss/MacShell#screenshots), by Rickky (`0-ss`).
+They are included as upstream references for the Dock and Control Center, and
+are not captures of Tahoe. The installed system ships the same 0.2.8 shell.
+
+| MacShell Dock (upstream) | MacShell Control Center (upstream) |
+|:---:|:---:|
+| ![MacShell Dock with Liquid Glass](docs/images/macshell-upstream-dock.png) | ![MacShell Control Center](docs/images/macshell-upstream-control-center.png) |
+
 The full verification record — including the login prompt, the binfmt rule and
 the swaybg process — is in [`docs/iso-installer.md`](docs/iso-installer.md) §9.
 
@@ -145,7 +156,8 @@ not a claim of authorship. Vendored code and notices are recorded in
 
 - **[MacShell](https://github.com/0-ss/MacShell)** / **MacLock** — Rickky
   ([0-ss](https://github.com/0-ss)), MIT. Menu bar, Dock, Spotlight, Control
-  Center, widgets and lock screen; vendored unmodified at `eb3d89f`.
+  Center, widgets and lock screen; vendored unmodified at `eebaaad`
+  (tag 0.2.8).
 - **[Hyprland](https://hypr.land/)** — Vaxry ([vaxry](https://github.com/vaxry))
   and contributors, BSD-3-Clause. The Wayland compositor and its Lua
   configuration API.
@@ -154,6 +166,9 @@ not a claim of authorship. Vendored code and notices are recorded in
   The QtQuick runtime the MacShell session runs on.
 - **[swaybg](https://github.com/swaywm/swaybg)** — the sway/wlroots
   contributors, MIT. The wallpaper daemon, run with the pixman renderer in VMs.
+- **Yosemite Valley wallpaper** — EF5, CC0 1.0, via
+  [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:%E2%80%9CTunnel_View%E2%80%9D_overlook_showing_famous_rock_formations_in_Yosemite_Valley_03.jpg).
+  Cropped and resized for the default dark wallpaper.
 - **[Papirus](https://github.com/PapirusDevelopmentTeam/papirus-icon-theme)** —
   Papirus Development Team, GPL-3.0. Icon theme.
 - **[Inter](https://rsms.me/inter/)** — Rasmus Andersson, SIL OFL 1.1.
@@ -181,7 +196,9 @@ not a claim of authorship. Vendored code and notices are recorded in
   GPL-3.0-or-later. Mach-O execution, out of process; not bundled.
 
 The base system is assembled from Arch Linux packages; each package carries its
-own copyright and license. Screenshots are QEMU captures taken for this project.
+own copyright and license. The Tahoe screenshots are QEMU captures taken for
+this project; the two `macshell-upstream-*` images are reproduced from the
+MacShell README under its MIT license.
 
 macOS and macOS Tahoe are trademarks of Apple Inc. Project Tahoe is an
 independent tribute and is not affiliated with or endorsed by Apple. See

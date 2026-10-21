@@ -49,6 +49,9 @@ quickshell
 swaybg
 qt6-shadertools
 qt6-svg
+# MacShell imports QtMultimedia for video wallpapers; the import is loaded
+# even when a static wallpaper is used.
+qt6-multimedia
 
 # ── sound ───────────────────────────────────────────────────────────
 pipewire
@@ -93,3 +96,9 @@ inotify-tools
 xorg-xwayland
 zenity
 fastfetch
+# MacShell details: MacLock reads its wallpaper through jq, the weather
+# widget fetches through curl, and the hardware media keys fall back to
+# playerctl when the shell is not running.
+jq
+curl
+playerctl

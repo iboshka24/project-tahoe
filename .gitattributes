@@ -31,3 +31,4 @@ iso/airootfs/etc/skel/.config/quickshell/macshell-* text eol=lf
 iso/airootfs/etc/skel/.config/quickshell/**/*.qsb   binary
 iso/airootfs/etc/skel/Pictures/**                   binary
 iso/airootfs/etc/skel/.config/quickshell/**/assets/** binary
+iso/airootfs/etc/skel/.config/quickshell/**/fonts/** binary

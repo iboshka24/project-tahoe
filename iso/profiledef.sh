@@ -24,4 +24,5 @@ file_permissions=(
   # as 0755 in the repository is 0644 in the image unless it is listed here.
   # macshell-start escaped this only because the session runs it as `sh ...`.
   ["/usr/local/bin/tahoe-installer"]="0:0:755"
+  ["/usr/local/bin/swaybg"]="0:0:755"
 )
