@@ -342,7 +342,7 @@ Booted with no arguments beyond `-nic user` (QEMU user networking, so the
 weather card had a route). The desktop came up with the photograph across the
 whole 1280×800 output and all four widget cards drawn — large Clock and
 Calendar on top, medium Weather and Player below. The Weather card is the
-load-bearing check here: it showed `Yosemite Valley 13 °C` fetched from
+load-bearing check here: it showed `Yosemite Valley 12 °C` fetched from
 Open-Meteo, so the session had working network, not just a styled layout.
 Capture: `Pictures/tahoe/tahoe-021-live-desktop.png`.
 

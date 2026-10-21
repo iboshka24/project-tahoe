@@ -164,7 +164,7 @@ cropped to 1920×1200 and stripped of metadata; see `NOTICE` and `REUSE.toml`.
 | Claim | Evidence |
 |---|---|
 | Every referenced file exists, is sane, has the right git mode | `tests/check-iso.sh` (also wired into `tests/check-all.sh`) |
-| The 2026-10-21 image renders the photo wallpaper and all four widgets on a real boot | live boot in QEMU with `-nic user`; full-screen Yosemite photograph, Clock/Calendar/Weather/Player drawn, Weather fetched `Yosemite Valley 13 °C` from Open-Meteo (`iso-installer.md` §10) |
+| The 2026-10-21 image renders the photo wallpaper and all four widgets on a real boot | live boot in QEMU with `-nic user`; full-screen Yosemite photograph, Clock/Calendar/Weather/Player drawn, Weather fetched `Yosemite Valley 12 °C` from Open-Meteo (`iso-installer.md` §10) |
 | The `hl.*` calls used are real API of Hyprland 0.55 | **partly wrong, found by booting:** `hl.dsp.reload_config` is nil (`hyprland.lua:100`), and because a Lua error aborts the file, everything after it never ran. Lines above 100 demonstrably work: `hl.env`, `hl.config`, `hl.bind`, `hl.exec_cmd` and the autostart all took effect |
 | MacShell's requirements are in `[extra]` | quickshell 0.3.2-1 listed at archlinux.org (checked 2026-10-18) |
 | Shell scripts parse | `sh -n` / `bash -n` inside `tests/check-iso.sh` |
